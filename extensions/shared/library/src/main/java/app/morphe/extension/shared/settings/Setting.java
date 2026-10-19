@@ -586,9 +586,13 @@ public abstract class Setting<T> {
      *         Defensive: handles null availability or missing getParentSettings() override.
      */
     public List<Setting<?>> getParentSettings() {
-        return availability == null
-                ? Collections.emptyList()
-                : Objects.requireNonNullElse(availability.getParentSettings(), Collections.emptyList());
+        if (availability == null) return Collections.emptyList();
+        try {
+            List<Setting<?>> parents = availability.getParentSettings();
+            return parents != null ? parents : Collections.emptyList();
+        } catch (Throwable t) {
+            return Collections.emptyList();
+        }
     }
 
     /**

@@ -195,6 +195,11 @@ public class Settings extends BaseSettings {
                 public boolean isAvailable() {
                     return GestureActions.takesLongPress(LONG_PRESS_ACTION.savedValue());
                 }
+
+                @Override
+                public java.util.List<Setting<?>> getParentSettings() {
+                    return java.util.Collections.singletonList(LONG_PRESS_ACTION);
+                }
             });
     /**
      * A long press on a side button plays at the hold speed only while TikTok's hold can start
@@ -207,6 +212,11 @@ public class Settings extends BaseSettings {
         public boolean isAvailable() {
             return !GestureActions.takesLongPress(LONG_PRESS_ACTION.savedValue())
                     && !(EDGE_SEEK.savedValue() && EDGE_SEEK_SECONDS.savedValue() > 0);
+        }
+
+        @Override
+        public java.util.List<Setting<?>> getParentSettings() {
+            return java.util.Arrays.asList(LONG_PRESS_ACTION, EDGE_SEEK);
         }
     };
     /** A long press on Comment plays at the hold speed instead of opening the emoji row. */
@@ -226,6 +236,11 @@ public class Settings extends BaseSettings {
                 public boolean isAvailable() {
                     return !GestureActions.takesLongPress(LONG_PRESS_ACTION.savedValue());
                 }
+
+                @Override
+                public java.util.List<Setting<?>> getParentSettings() {
+                    return java.util.Collections.singletonList(LONG_PRESS_ACTION);
+                }
             });
     /** The same For You menu for a long press on a video opened from search results (#120). */
     public static final BooleanSetting LONG_PRESS_FULL_MENU_IN_SEARCH =
@@ -233,6 +248,11 @@ public class Settings extends BaseSettings {
                 @Override
                 public boolean isAvailable() {
                     return !GestureActions.takesLongPress(LONG_PRESS_ACTION.savedValue());
+                }
+
+                @Override
+                public java.util.List<Setting<?>> getParentSettings() {
+                    return java.util.Collections.singletonList(LONG_PRESS_ACTION);
                 }
             });
     /** What a left swipe on a feed video does: TikTok's creator profile, nothing, or the comments. */
@@ -677,6 +697,10 @@ public class Settings extends BaseSettings {
             new Setting.Availability() {
                 @Override public boolean isAvailable() {
                     return android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q;
+                }
+
+                @Override public java.util.List<Setting<?>> getParentSettings() {
+                    return java.util.Collections.emptyList();
                 }
             });
     /**
