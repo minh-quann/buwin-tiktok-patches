@@ -140,15 +140,6 @@ val accentColorPatch = resourcePatch(
  * AccentColorPaletteTest holds each declared build's fixture to its entry here.
  */
 internal val ACCENT_TOKENS: Map<String, Map<String, Pair<String, String>>> = linkedMapOf(
-    "47.1.4" to linkedMapOf(
-        "UIShapePrimary" to ("ah3" to "awa"),
-        "UIShapePrimary2" to ("ah4" to "awb"),
-        "UIShapePrimary3" to ("ah5" to "awc"),
-        "UIShapePrimary4" to ("ah6" to "awd"),
-        "UIShapePrimary5" to ("ah7" to "awe"),
-        "UITextPrimary" to ("aiv" to "ay3"),
-        "UITextPrimaryDisplay" to ("aiw" to "ay4"),
-    ),
     "47.4.3" to linkedMapOf(
         "UIShapePrimary" to ("ah5" to "awd"),
         "UIShapePrimary2" to ("ah6" to "awe"),
@@ -183,7 +174,6 @@ internal fun unreadAccentRefusal(versionName: String?): String {
  * AccentColorPaletteTest holds each declared build's fixture to its entry here.
  */
 internal val ACCENT_ICONS: Map<String, List<String>> = linkedMapOf(
-    "47.1.4" to listOf("bv8"),
     "47.4.3" to listOf("bty"),
 )
 

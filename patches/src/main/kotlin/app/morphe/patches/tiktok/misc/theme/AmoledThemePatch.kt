@@ -152,7 +152,6 @@ internal fun renamedPathCollisions(
  * of its own and stays.
  */
 internal val DARK_BACKGROUND_COLORS: Map<String, Set<String>> = linkedMapOf(
-    "47.1.4" to setOf("a40", "a42", "a43", "a45", "a4c"),
     "47.4.3" to setOf("a42", "a44", "a45", "a47", "a4e"),
 )
 
@@ -193,7 +192,6 @@ internal fun declaredVersions(): Set<String> =
  * another surface tier, which is why only a build whose names were read is patched.
  */
 internal val SURFACE_STYLE_ITEMS: Map<String, Set<String>> = linkedMapOf(
-    "47.1.4" to setOf("agk", "c3", "aia", "aig", "bx", "agn"),
     "47.4.3" to setOf("agm", "c3", "aic", "aii", "bx", "agp"),
 )
 
