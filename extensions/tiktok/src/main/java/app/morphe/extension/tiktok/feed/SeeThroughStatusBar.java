@@ -195,19 +195,31 @@ public final class SeeThroughStatusBar {
 
         String style = Settings.STATUS_BAR_STYLE.get();
         boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
-        boolean doShift = wanted && (Settings.STATUS_BAR_STYLE_SHIFT.equals(style)
-                || Settings.STATUS_BAR_STYLE_SHIFT_FULL.equals(style));
+        boolean doShift = wanted && Settings.STATUS_BAR_STYLE_SHIFT.equals(style);
 
         ViewParent space = player.getParent();
         boolean spaceValid = space instanceof View;
         int spaceHeight = spaceValid ? ((View) space).getHeight() : group.getHeight();
 
         if (doScale) {
-            // Scale mode (1.4x)
+            // Scale mode: center vertically and scale with minimal crop (balanced iOS style)
             shift(player, 0f);
             if (surface != null) {
-                shift(surface, 0f);
-                grow(surface, fillScale(group.getHeight(), surface));
+                int pHeight = group.getHeight();
+                int sHeight = surface.getHeight();
+                int sWidth = surface.getWidth();
+                if (pHeight > sHeight && sHeight > sWidth && sWidth > 0) {
+                    float top = surface.getTop();
+                    float bottom = pHeight - surface.getBottom();
+                    float centerShift = (top - bottom) / 2f;
+                    shift(surface, -centerShift);
+                    float optimalScale = ((pHeight - sHeight) + sHeight + 2f) / sHeight;
+                    if (optimalScale > MAX_FILL_SCALE) optimalScale = MAX_FILL_SCALE;
+                    grow(surface, optimalScale);
+                } else {
+                    shift(surface, 0f);
+                    grow(surface, fillScale(group.getHeight(), surface));
+                }
             } else if (spaceValid) {
                 grow(player, fillScale(spaceHeight, player, true));
             }

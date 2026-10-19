@@ -862,20 +862,18 @@ public class Settings extends BaseSettings {
      * this goes off or Buwin is paused. Read on each layout.
      */
     public static final BooleanSetting SEE_THROUGH_STATUS_BAR = new BooleanSetting("see_through_status_bar", FALSE);
-    public static final String STATUS_BAR_STYLE_SHIFT = "shift";
-    public static final String STATUS_BAR_STYLE_SHIFT_FULL = "shift_full";
-    public static final String STATUS_BAR_STYLE_GRADIENT = "gradient";
     public static final String STATUS_BAR_STYLE_SCALE = "scale";
+    public static final String STATUS_BAR_STYLE_SHIFT = "shift";
+    public static final String STATUS_BAR_STYLE_GRADIENT = "gradient";
     /**
      * How the video and status bar blend together when See-through status bar is on:
-     * - "shift": Shifts video upwards to cover the status bar and lifts bottom bar by half (Plan A).
-     * - "shift_full": Shifts video upwards and lifts bottom bar by full status bar height (Plan B).
+     * - "scale": Centers and scales video minimally to fill the screen (balanced iOS style).
+     * - "shift": Shifts video upwards to cover the status bar without cropping horizontal content.
      * - "gradient": Keeps video centered with a smooth ambient dark-to-transparent scrim over the bar.
-     * - "scale": Scales video up (1.4x) to fill entire screen vertically and horizontally.
      */
     public static final StringSetting STATUS_BAR_STYLE = new StringSetting(
             "status_bar_style",
-            STATUS_BAR_STYLE_SHIFT,
+            STATUS_BAR_STYLE_SCALE,
             false,
             Setting.parent(SEE_THROUGH_STATUS_BAR)
     );

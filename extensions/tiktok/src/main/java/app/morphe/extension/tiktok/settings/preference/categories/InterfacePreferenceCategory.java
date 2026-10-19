@@ -631,13 +631,12 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     context,
                     "Status bar style",
                     Settings.STATUS_BAR_STYLE,
-                    new String[]{"Shift video up (Split bottom)", "Shift video up (Full bottom)", "Ambient gradient", "Scale to fill"},
-                    new String[]{Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_SHIFT_FULL, Settings.STATUS_BAR_STYLE_GRADIENT, Settings.STATUS_BAR_STYLE_SCALE}
+                    new String[]{"Scale to fill (Balanced / iOS style)", "Shift video up", "Ambient gradient"},
+                    new String[]{Settings.STATUS_BAR_STYLE_SCALE, Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_GRADIENT}
             ).withNote("How the video and status bar blend together:\n"
-                    + "• Shift video up (Split bottom): Shifts video up under status bar and lifts bottom bar by half to add a bottom edge margin (Plan A).\n"
-                    + "• Shift video up (Full bottom): Shifts video up under status bar and lifts bottom bar by full status bar height for a prominent bottom chin (Plan B).\n"
-                    + "• Ambient gradient: Keeps video centered and blends the status bar with a soft YouTube-style gradient.\n"
-                    + "• Scale to fill: Scales the video 1.4x to fill the screen entirely (may crop edges)."));
+                    + "• Scale to fill (Balanced / iOS style): Centers and scales the video minimally to fill the screen without cutting off text or subtitles (recommended, similar to iOS).\n"
+                    + "• Shift video up: Moves the video up under the status bar with 1:1 scale (zero cropping).\n"
+                    + "• Ambient gradient: Keeps video centered and blends the status bar with a soft YouTube-style gradient."));
             addPreference(new ChoicePreference(context, "Burn-in guard", Settings.BURN_IN_GUARD,
                     new String[]{"Off", "Dim when idle", "Dim when idle and shift"},
                     new String[]{BurnInGuard.OFF, BurnInGuard.DIM, BurnInGuard.DIM_AND_SHIFT})
