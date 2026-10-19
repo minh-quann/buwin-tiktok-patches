@@ -59,13 +59,10 @@ internal object AppCompatibilities {
     const val PINEDRAMA_4714_VERSION_CODE = 2024701040
 
     /** The version codes of every declared build of either app, for the patches that read one off the manifest. */
-    val DECLARED_VERSION_CODES = TIKTOK_VERSION_CODES + PINEDRAMA_4714_VERSION_CODE
+    val DECLARED_VERSION_CODES = TIKTOK_VERSION_CODES
 
     /**
-     * PineDrama 47.1.4 (#156). It's built from TikTok's 47.1.4 code, so the patches whose anchors it
-     * keeps apply to it. Only those declare it: the rest anchor on TikTok's feed, LIVE, inbox or
-     * resources, which PineDrama changed or dropped. Each of those patches has to match both
-     * TikTok's declared build and this one.
+     * PineDrama 47.1.4 (#156). Retained for reference, but excluded from active patches.
      */
     fun pineDrama(): Array<Compatibility> = arrayOf(
         Compatibility(
@@ -79,6 +76,6 @@ internal object AppCompatibilities {
         ),
     )
 
-    /** For a patch checked on both apps: TikTok's targets and PineDrama's. */
-    fun tiktokAndPineDrama(): Array<Compatibility> = tiktok() + pineDrama()
+    /** Only TikTok is targeted for Buwin patches. */
+    fun tiktokAndPineDrama(): Array<Compatibility> = tiktok()
 }

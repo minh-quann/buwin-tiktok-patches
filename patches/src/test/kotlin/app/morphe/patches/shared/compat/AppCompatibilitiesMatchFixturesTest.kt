@@ -69,7 +69,7 @@ class AppCompatibilitiesMatchFixturesTest {
         assertEquals("declared TikTok codes", expected.values.toSet(), AppCompatibilities.TIKTOK_VERSION_CODES)
         assertEquals(
             "the codes the Play Store patch accepts",
-            expected.values.toSet() + AppCompatibilities.PINEDRAMA_4714_VERSION_CODE,
+            expected.values.toSet(),
             AppCompatibilities.DECLARED_VERSION_CODES,
         )
         for (target in targets) {
@@ -103,7 +103,7 @@ class AppCompatibilitiesMatchFixturesTest {
             listOf("47.1.4" to setOf(2024701040)),
             pineDrama.targets.map { it.version to it.versionCodes?.values?.toSet() },
         )
-        assertEquals(listOf("TikTok", "PineDrama"), AppCompatibilities.tiktokAndPineDrama().map { it.name })
+        assertEquals(listOf("TikTok"), AppCompatibilities.tiktokAndPineDrama().map { it.name })
     }
 
     /** Every APK a fixture holds: itself, or each split inside an .apkm, copied out to a temp file. */

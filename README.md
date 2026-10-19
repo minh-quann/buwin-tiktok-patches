@@ -342,7 +342,6 @@ Các giao dịch nạp xu hoặc thanh toán trong app có thể bị từ chố
 - **Mã băm SHA-256 đối chiếu của APK gốc:**
   - Phiên bản 47.1.4: `d475cfbc3205b958e370a2fdbf08ee90efeb36531988e0ec3531b7d519b7a4be`
   - Phiên bản 47.4.3: `af7cbe2b00d33ff1339730f6abb8ed7e387a83b27ff2b16748b8f41e6fc87e0b`
-- Hỗ trợ ứng dụng phim ngắn PineDrama phiên bản 47.1.4 (`com.ss.android.ttmd.video`).
 
 Kiểm tra mã băm tệp APK đã tải về trên máy tính bằng PowerShell:
 ```powershell
