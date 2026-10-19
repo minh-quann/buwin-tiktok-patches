@@ -107,6 +107,10 @@ public final class SeeThroughStatusBar {
         if ((was == null ? 1f : was) == current && view.getScaleX() == current) {
             if (scale == current) return;
         }
+        if (view.getWidth() > 0 && view.getHeight() > 0) {
+            view.setPivotX(view.getWidth() / 2f);
+            view.setPivotY(view.getHeight() / 2f);
+        }
         view.setScaleX(scale);
         view.setScaleY(scale);
         if (scale == 1f) {
@@ -138,8 +142,8 @@ public final class SeeThroughStatusBar {
             float scale = (Math.max(top, bottom) * 2f + height + 2f) / height;
             return scale > MAX_FILL_SCALE ? 1f : scale;
         }
-        if (Math.abs(top - bottom) > 2f) return 1f;
-        float scale = (spaceHeight + 2f) / height;
+        if (Math.abs(top - bottom) > 60f) return 1f;
+        float scale = (Math.max(top, bottom) * 2f + height + 2f) / height;
         return scale > MAX_FILL_SCALE ? 1f : scale;
     }
 

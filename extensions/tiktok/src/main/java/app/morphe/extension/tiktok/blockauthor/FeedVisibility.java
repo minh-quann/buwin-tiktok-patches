@@ -48,8 +48,8 @@ public final class FeedVisibility {
      * Home's). A build with no such view answers null and the tab is simply not covered.
      */
     private static final String[] FRIENDS_TAB_RESOURCE_NAMES = {"47.4.3:ong", "47.1.4:opg"};
-    private static final String[] COMMENT_SHEET_RESOURCE_NAMES = {"47.4.3:pwm", "47.1.4:pwm"};
-    private static final String[] COMMENT_TITLE_RESOURCE_NAMES = {"47.4.3:wla", "47.1.4:wla"};
+    private static final String[] COMMENT_SHEET_RESOURCE_NAMES = {"47.4.3:pwm", "47.1.4:pyf"};
+    private static final String[] COMMENT_TITLE_RESOURCE_NAMES = {"47.4.3:wla", "47.1.4:wny"};
     // Built once: the sheet check runs on every layout pass of the feed's window.
     private static final String COMMENT_SHEET_DIAGNOSTIC_NAME =
             "sheet (" + joinResourceNames(COMMENT_SHEET_RESOURCE_NAMES) + ")";

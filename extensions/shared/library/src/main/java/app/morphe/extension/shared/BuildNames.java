@@ -21,8 +21,9 @@ import android.content.Context;
  * there (#156).
  */
 public final class BuildNames {
-    /** The app whose builds the names are written for. */
+    /** The apps whose builds the names are written for. */
     static final String NAMED_APP = "com.zhiliaoapp.musically";
+    static final String TRILL_APP = "com.ss.android.ugc.trill";
 
     private static volatile String runningBuild;
     private static volatile String runningApp;
@@ -35,7 +36,7 @@ public final class BuildNames {
         int colon = name.indexOf(':');
         if (colon < 0) return name;
         String build = runningBuild();
-        return build == null || !NAMED_APP.equals(runningApp) ? null : entryName(name, build);
+        return build == null || (!NAMED_APP.equals(runningApp) && !TRILL_APP.equals(runningApp)) ? null : entryName(name, build);
     }
 
     /** The entry name to look up on [build], or null when the name is another build's. */
