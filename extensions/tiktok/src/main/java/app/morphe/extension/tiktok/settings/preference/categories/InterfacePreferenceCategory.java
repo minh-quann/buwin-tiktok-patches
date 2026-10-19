@@ -631,12 +631,13 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     context,
                     "Status bar style",
                     Settings.STATUS_BAR_STYLE,
-                    new String[]{"Scale to fill (Balanced / iOS style)", "Shift video up", "Ambient gradient"},
-                    new String[]{Settings.STATUS_BAR_STYLE_SCALE, Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_GRADIENT}
+                    new String[]{"Scale to fill (Balanced / iOS style)", "Shift video up (Zero crop)", "Shift video up (Split margin)", "Ambient gradient (YouTube style)"},
+                    new String[]{Settings.STATUS_BAR_STYLE_SCALE, Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_SHIFT_SPLIT, Settings.STATUS_BAR_STYLE_GRADIENT}
             ).withNote("How the video and status bar blend together:\n"
                     + "• Scale to fill (Balanced / iOS style): Centers and scales the video minimally to fill the screen without cutting off text or subtitles (recommended, similar to iOS).\n"
-                    + "• Shift video up: Moves the video up under the status bar with 1:1 scale (zero cropping).\n"
-                    + "• Ambient gradient: Keeps video centered and blends the status bar with a soft YouTube-style gradient."));
+                    + "• Shift video up (Zero crop): Moves the video up under the status bar with 1:1 scale (zero horizontal cropping).\n"
+                    + "• Shift video up (Split margin): Shifts video up halfway to balance the black border evenly between top and bottom (zero cropping).\n"
+                    + "• Ambient gradient (YouTube style): Moves video under status bar with a soft ambient gradient overlay for optimal clock visibility."));
             addPreference(new ChoicePreference(context, "Burn-in guard", Settings.BURN_IN_GUARD,
                     new String[]{"Off", "Dim when idle", "Dim when idle and shift"},
                     new String[]{BurnInGuard.OFF, BurnInGuard.DIM, BurnInGuard.DIM_AND_SHIFT})

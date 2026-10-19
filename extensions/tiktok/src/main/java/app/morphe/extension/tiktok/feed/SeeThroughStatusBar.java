@@ -196,6 +196,8 @@ public final class SeeThroughStatusBar {
         String style = Settings.STATUS_BAR_STYLE.get();
         boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
         boolean doShift = wanted && Settings.STATUS_BAR_STYLE_SHIFT.equals(style);
+        boolean doShiftSplit = wanted && Settings.STATUS_BAR_STYLE_SHIFT_SPLIT.equals(style);
+        boolean doGradient = wanted && Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
 
         ViewParent space = player.getParent();
         boolean spaceValid = space instanceof View;
@@ -223,9 +225,8 @@ public final class SeeThroughStatusBar {
             } else if (spaceValid) {
                 grow(player, fillScale(spaceHeight, player, true));
             }
-        } else if (doShift) {
-            // Shift mode: keep 1:1 scale, shift video upwards so top reaches status bar area,
-            // leaving a black border at the bottom near the bottom navigation bar.
+        } else if (doShift || doGradient) {
+            // Shift mode or Ambient Gradient: keep 1:1 scale (zero horizontal crop), shift upwards so top reaches status bar
             if (surface != null) {
                 grow(surface, 1f);
                 if (surface.getTop() > 0 && group.getHeight() > surface.getHeight()) {
@@ -242,8 +243,26 @@ public final class SeeThroughStatusBar {
                 float pShift = computeShift(player, spaceHeight);
                 shift(player, -pShift);
             }
+        } else if (doShiftSplit) {
+            // Shift Split mode: keep 1:1 scale, shift upwards halfway to balance top and bottom margins
+            if (surface != null) {
+                grow(surface, 1f);
+                if (surface.getTop() > 0 && group.getHeight() > surface.getHeight()) {
+                    float sShift = computeShift(surface, group.getHeight()) / 2f;
+                    shift(surface, -sShift);
+                    shift(player, 0f);
+                } else {
+                    shift(surface, 0f);
+                    float pShift = computeShift(player, spaceHeight) / 2f;
+                    shift(player, -pShift);
+                }
+            } else {
+                grow(player, 1f);
+                float pShift = computeShift(player, spaceHeight) / 2f;
+                shift(player, -pShift);
+            }
         } else {
-            // Default / Gradient mode or comments open: restore 1:1 scale and 0 translation if previously modified
+            // Default or comments open: restore 1:1 scale and 0 translation if previously modified
             grow(player, 1f);
             shift(player, 0f);
             if (surface != null) {

@@ -4,13 +4,18 @@
  */
 package app.morphe.extension.tiktok.feed;
 
+import android.app.Activity;
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.InsetDrawable;
+import android.os.Build;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
 
 import app.morphe.extension.tiktok.settings.preference.SettingsUi;
 
@@ -79,6 +84,11 @@ final class SeeThroughBottomBar {
     /** Bars whose background this class replaced, with the drawable each had. */
     private static final Map<View, Drawable> BACKGROUNDS = new WeakHashMap<>();
 
+    /** Original heights and bottom paddings of views adjusted for chin. */
+    private static final Map<View, Integer> ORIGINAL_BAR_HEIGHT = new WeakHashMap<>();
+    private static final Map<View, Integer> ORIGINAL_BAR_PADDING_BOTTOM = new WeakHashMap<>();
+    private static final Map<View, Integer> ORIGINAL_SPACER_HEIGHT = new WeakHashMap<>();
+
     /**
      * Overlays (the caption frame, the buttons' column) measured with the spacer in place: true
      * when one sat clear of the bar then. Only an overlay that was fine before the collapse can
@@ -90,6 +100,121 @@ final class SeeThroughBottomBar {
     private static boolean collapseRefused;
 
     private SeeThroughBottomBar() {
+    }
+
+    /**
+     * Checks if the device's navigation indicator / navigation bar is active (visible).
+     * Returns true if bottom inset > 0 (user has gesture indicator or 3-button nav enabled).
+     * Returns false if bottom inset == 0 (user disabled gesture indicator in system settings).
+     * Defaults to true if insets are not yet available (e.g. before attached or during unit tests).
+     */
+    static boolean isSystemIndicatorActive(View view) {
+        if (view == null) return true;
+        WindowInsets insets = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            insets = view.getRootWindowInsets();
+        }
+        if (insets == null) {
+            Activity act = SeeThroughStatusBar.activityOf(view);
+            if (act != null && act.getWindow() != null && act.getWindow().getDecorView() != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    insets = act.getWindow().getDecorView().getRootWindowInsets();
+                }
+            }
+        }
+        if (insets != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                return insets.getInsets(WindowInsets.Type.navigationBars()).bottom > 0;
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                return insets.getSystemWindowInsetBottom() > 0;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns the height (in pixels) of the navigation bar chin to reserve when the user
+     * has disabled the system gesture indicator (~22dp).
+     */
+    static int getChinHeight(Context context) {
+        if (context == null) return 0;
+        float density = context.getResources().getDisplayMetrics().density;
+        int defaultChin = Math.round(22 * density);
+        int resId = context.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resId > 0) {
+            try {
+                int navH = context.getResources().getDimensionPixelSize(resId);
+                if (navH > 0 && navH <= Math.round(32 * density)) {
+                    return navH;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return defaultChin;
+    }
+
+    /**
+     * Adjusts the bottom bar's height and bottom padding:
+     * - When system indicator is disabled: adds the chin height so the bar is comfortably elevated
+     *   and leaves a solid black border at the bottom edge of the screen (similar to iOS chin).
+     * - When system indicator is enabled: does not add chin ("bật thì không chừa nữa").
+     */
+    static void adjustBottomBarChin(View bar) {
+        if (bar == null) return;
+        boolean indicatorActive = isSystemIndicatorActive(bar);
+        int chin = indicatorActive ? 0 : getChinHeight(bar.getContext());
+
+        ViewGroup.LayoutParams lp = bar.getLayoutParams();
+        if (lp != null) {
+            Integer origH = ORIGINAL_BAR_HEIGHT.get(bar);
+            if (origH == null) {
+                origH = lp.height > 0 ? lp.height : bar.getHeight();
+                if (origH > 0) ORIGINAL_BAR_HEIGHT.put(bar, origH);
+            }
+            if (origH != null && origH > 0) {
+                int targetH = origH + chin;
+                if (lp.height != targetH) {
+                    lp.height = targetH;
+                    bar.setLayoutParams(lp);
+                }
+            }
+        }
+
+        Integer origPad = ORIGINAL_BAR_PADDING_BOTTOM.get(bar);
+        if (origPad == null) {
+            origPad = bar.getPaddingBottom();
+            ORIGINAL_BAR_PADDING_BOTTOM.put(bar, origPad);
+        }
+        int targetPad = origPad + chin;
+        if (bar.getPaddingBottom() != targetPad) {
+            bar.setPadding(bar.getPaddingLeft(), bar.getPaddingTop(), bar.getPaddingRight(), targetPad);
+        }
+    }
+
+    /**
+     * Adjusts the cell bottom spacer's height by the chin height so the video content
+     * and video_seek_bar stop cleanly above the elevated bottom bar, preventing any overlap.
+     */
+    static void adjustBottomSpacerChin(View spacer) {
+        if (spacer == null) return;
+        boolean indicatorActive = isSystemIndicatorActive(spacer);
+        int chin = indicatorActive ? 0 : getChinHeight(spacer.getContext());
+
+        ViewGroup.LayoutParams lp = spacer.getLayoutParams();
+        if (lp != null) {
+            Integer origH = ORIGINAL_SPACER_HEIGHT.get(spacer);
+            if (origH == null) {
+                origH = lp.height > 0 ? lp.height : spacer.getHeight();
+                if (origH > 0) ORIGINAL_SPACER_HEIGHT.put(spacer, origH);
+            }
+            if (origH != null && origH > 0) {
+                int targetH = origH + chin;
+                if (lp.height != targetH) {
+                    lp.height = targetH;
+                    spacer.setLayoutParams(lp);
+                }
+            }
+        }
     }
 
     /** Whether the spacer under the video may be collapsed. */
@@ -134,9 +259,14 @@ final class SeeThroughBottomBar {
                     : new ClearBackground());
             return;
         }
-        if (!BACKGROUNDS.containsKey(bar)) return;
+        if (!BACKGROUNDS.containsKey(bar)) {
+            if (current instanceof ClearBackground) {
+                bar.setBackgroundColor(Color.BLACK);
+            }
+            return;
+        }
         Drawable original = BACKGROUNDS.remove(bar);
-        if (ours) bar.setBackground(original);
+        if (ours) bar.setBackground(original != null ? original : new ColorDrawable(Color.BLACK));
     }
 
     /**

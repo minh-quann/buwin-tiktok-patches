@@ -478,6 +478,29 @@ public class SeeThroughStatusBarTest {
         }
     }
 
+    @Test
+    public void shiftSplitStyleShiftsSurfaceUpByHalf() {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup().visible()) {
+            Activity activity = controller.get();
+            Utils.setContext(activity);
+            ViewGroup cell = feedCell(activity, View.VISIBLE);
+            FrameLayout player = new FrameLayout(activity);
+            SurfaceView surface = new SurfaceView(activity);
+            player.addView(surface);
+            cell.addView(player, new FrameLayout.LayoutParams(1080, 2181));
+            showVideo(player, surface, 1107, 1968);
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SHIFT_SPLIT);
+            VideoOverlayHider.applyTo(activity);
+
+            assertEquals("scaleX modified", 1f, surface.getScaleX(), 0f);
+            assertEquals("surface was not shifted up by half", -53f, surface.getTranslationY(), 0f);
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(false);
+            VideoOverlayHider.applyTo(activity);
+        }
+    }
 
     @Test
     public void tiktokCommentShrinkingDoesNotGetOverwrittenByMorphe() {

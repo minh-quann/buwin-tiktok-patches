@@ -1354,6 +1354,7 @@ public final class VideoOverlayHider {
         List<View> bars = selectedViews(found, selected, BOTTOM_TABS_TARGET);
         List<View> overlays = new ArrayList<>(selectedViews(found, selected, ANCHOR_TARGET));
         overlays.addAll(selectedViews(found, selected, ACTION_BAR_TARGET));
+        overlays.addAll(selectedViews(found, selected, CLEAR_SEEK_BAR_TARGET));
         boolean refused = false;
         for (View bar : bars) {
             refused |= SeeThroughBottomBar.judge(bar, overlays, collapsed);
@@ -1885,6 +1886,7 @@ public final class VideoOverlayHider {
                         boolean clearBar = seeThroughBarNow && !wanted;
                         // Floating bottom bar draws a rounded pill there instead (#124).
                         if (target == BOTTOM_TABS_TARGET) {
+                            SeeThroughBottomBar.adjustBottomBarChin(view);
                             SeeThroughBottomBar.setBackgroundClear(view, clearBar, floatingBarNow);
                         }
                         if (target == BOTTOM_TABS_DIVIDER_TARGET && clearBar) {
@@ -1901,6 +1903,9 @@ public final class VideoOverlayHider {
                         // The Following stories pill is the strip's neighbour at the top of the
                         // feed, so it fades with the tabs; it was only ever hidden (#84).
                         setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                        setHidden(view, wanted);
+                    } else if (target == BOTTOM_SPACER_TARGET) {
+                        SeeThroughBottomBar.adjustBottomSpacerChin(view);
                         setHidden(view, wanted);
                     } else setHidden(view, wanted);
                 }
