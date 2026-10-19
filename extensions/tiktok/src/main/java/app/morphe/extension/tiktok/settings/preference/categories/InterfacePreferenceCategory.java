@@ -631,10 +631,11 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     context,
                     "Status bar style",
                     Settings.STATUS_BAR_STYLE,
-                    new String[]{"Shift video up", "Ambient gradient", "Scale to fill"},
-                    new String[]{Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_GRADIENT, Settings.STATUS_BAR_STYLE_SCALE}
+                    new String[]{"Shift video up (Split bottom)", "Shift video up (Full bottom)", "Ambient gradient", "Scale to fill"},
+                    new String[]{Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_SHIFT_FULL, Settings.STATUS_BAR_STYLE_GRADIENT, Settings.STATUS_BAR_STYLE_SCALE}
             ).withNote("How the video and status bar blend together:\n"
-                    + "• Shift video up: Moves the video up under the status bar without cropping side content (recommended for tall displays).\n"
+                    + "• Shift video up (Split bottom): Shifts video up under status bar and lifts bottom bar by half to add a bottom edge margin (Plan A).\n"
+                    + "• Shift video up (Full bottom): Shifts video up under status bar and lifts bottom bar by full status bar height for a prominent bottom chin (Plan B).\n"
                     + "• Ambient gradient: Keeps video centered and blends the status bar with a soft YouTube-style gradient.\n"
                     + "• Scale to fill: Scales the video 1.4x to fill the screen entirely (may crop edges)."));
             addPreference(new ChoicePreference(context, "Burn-in guard", Settings.BURN_IN_GUARD,

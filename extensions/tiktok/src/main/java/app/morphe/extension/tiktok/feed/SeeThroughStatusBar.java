@@ -6,6 +6,7 @@ package app.morphe.extension.tiktok.feed;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -21,6 +22,7 @@ import android.widget.FrameLayout;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
 import app.morphe.extension.tiktok.settings.Settings;
 import app.morphe.extension.tiktok.settings.SettingsStatus;
 
@@ -147,15 +149,31 @@ public final class SeeThroughStatusBar {
     }
 
     /**
+     * Finds the Activity hosting the given view.
+     */
+    static Activity activityOf(View view) {
+        if (view == null) return null;
+        Context context = view.getContext();
+        while (context instanceof ContextWrapper) {
+            if (context instanceof Activity) return (Activity) context;
+            context = ((ContextWrapper) context).getBaseContext();
+        }
+        return null;
+    }
+
+    /**
      * One layout pass over a feed cell's player: manages video size and position
      * based on the selected {@link Settings#STATUS_BAR_STYLE}.
      */
     static void fill(View player, boolean wanted) {
         if (!(player instanceof ViewGroup)) return;
         if (wanted && fitWins()) wanted = false;
-        String style = Settings.STATUS_BAR_STYLE.get();
-        boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
-        boolean doShift = wanted && Settings.STATUS_BAR_STYLE_SHIFT.equals(style);
+        if (wanted) {
+            Activity activity = activityOf(player);
+            if (activity != null && FeedVisibility.isCommentSheetVisible(activity)) {
+                wanted = false;
+            }
+        }
 
         ViewGroup group = (ViewGroup) player;
         View surface = null;
@@ -166,6 +184,19 @@ public final class SeeThroughStatusBar {
                 break;
             }
         }
+
+        // If TikTok is actively scaling down the player/surface for comments or transition, yield immediately
+        if (wanted) {
+            if ((player.getScaleX() < 0.98f && !FILLED.containsKey(player))
+                    || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface))) {
+                wanted = false;
+            }
+        }
+
+        String style = Settings.STATUS_BAR_STYLE.get();
+        boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
+        boolean doShift = wanted && (Settings.STATUS_BAR_STYLE_SHIFT.equals(style)
+                || Settings.STATUS_BAR_STYLE_SHIFT_FULL.equals(style));
 
         ViewParent space = player.getParent();
         boolean spaceValid = space instanceof View;
@@ -200,7 +231,7 @@ public final class SeeThroughStatusBar {
                 shift(player, -pShift);
             }
         } else {
-            // Default / Gradient mode: restore 1:1 scale and 0 translation
+            // Default / Gradient mode or comments open: restore 1:1 scale and 0 translation if previously modified
             grow(player, 1f);
             shift(player, 0f);
             if (surface != null) {
@@ -217,6 +248,18 @@ public final class SeeThroughStatusBar {
 
     /** Writes {@code scale} on {@code view} and tracks it. */
     private static void grow(View view, float scale) {
+        if (scale == 1f) {
+            Float was = FILLED.remove(view);
+            if (was != null) {
+                if (view.getWidth() > 0 && view.getHeight() > 0) {
+                    view.setPivotX(view.getWidth() / 2f);
+                    view.setPivotY(view.getHeight() / 2f);
+                }
+                view.setScaleX(1f);
+                view.setScaleY(1f);
+            }
+            return;
+        }
         Float was = FILLED.get(view);
         float current = view.getScaleY();
         if ((was == null ? 1f : was) == current && view.getScaleX() == current) {
@@ -228,25 +271,24 @@ public final class SeeThroughStatusBar {
         }
         view.setScaleX(scale);
         view.setScaleY(scale);
-        if (scale == 1f) {
-            FILLED.remove(view);
-            return;
-        }
         FILLED.put(view, scale);
     }
 
     /** Writes {@code translationY} on {@code view} and tracks it. */
     private static void shift(View view, float translationY) {
+        if (translationY == 0f) {
+            Float was = SHIFTED.remove(view);
+            if (was != null) {
+                view.setTranslationY(0f);
+            }
+            return;
+        }
         Float was = SHIFTED.get(view);
         float current = view.getTranslationY();
         if ((was == null ? 0f : was) == current) {
             if (translationY == current) return;
         }
         view.setTranslationY(translationY);
-        if (translationY == 0f) {
-            SHIFTED.remove(view);
-            return;
-        }
         SHIFTED.put(view, translationY);
     }
 

@@ -477,5 +477,62 @@ public class SeeThroughStatusBarTest {
             assertEquals(OWN_BAR_COLOR, activity.getWindow().getStatusBarColor());
         }
     }
+
+    @Test
+    public void shiftFullStyleShiftsSurfaceUp() {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup().visible()) {
+            Activity activity = controller.get();
+            Utils.setContext(activity);
+            ViewGroup cell = feedCell(activity, View.VISIBLE);
+            FrameLayout player = new FrameLayout(activity);
+            SurfaceView surface = new SurfaceView(activity);
+            player.addView(surface);
+            cell.addView(player, new FrameLayout.LayoutParams(1080, 2181));
+            showVideo(player, surface, 1107, 1968);
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SHIFT_FULL);
+            VideoOverlayHider.applyTo(activity);
+
+            assertEquals("scaleX modified", 1f, surface.getScaleX(), 0f);
+            assertEquals("surface was not shifted up to the top", -106f, surface.getTranslationY(), 0f);
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(false);
+            VideoOverlayHider.applyTo(activity);
+            assertEquals(0f, surface.getTranslationY(), 0f);
+        }
+    }
+
+    @Test
+    public void tiktokCommentShrinkingDoesNotGetOverwrittenByMorphe() {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup().visible()) {
+            Activity activity = controller.get();
+            Utils.setContext(activity);
+            ViewGroup cell = feedCell(activity, View.VISIBLE);
+            FrameLayout player = new FrameLayout(activity);
+            SurfaceView surface = new SurfaceView(activity);
+            player.addView(surface);
+            cell.addView(player, new FrameLayout.LayoutParams(1080, 2181));
+            showVideo(player, surface, 1107, 1968);
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SHIFT);
+            VideoOverlayHider.applyTo(activity);
+            assertEquals(-106f, surface.getTranslationY(), 0f);
+
+            // Simulate TikTok shrinking the player view when comments sheet opens
+            player.setScaleX(0.7f);
+            player.setScaleY(0.7f);
+            player.setTranslationY(-300f);
+
+            // Trigger overlay pass while comments are opening/open
+            SeeThroughStatusBar.fill(player, true);
+
+            // Morphe detects TikTok's shrinking and yields without overwriting TikTok's scale/translation
+            assertEquals("TikTok scaleX was overridden", 0.7f, player.getScaleX(), 0f);
+            assertEquals("TikTok scaleY was overridden", 0.7f, player.getScaleY(), 0f);
+            assertEquals("TikTok translation was overridden", -300f, player.getTranslationY(), 0f);
+        }
+    }
 }
 

@@ -391,6 +391,10 @@ public final class VideoOverlayHider {
     private static boolean seeThroughBarNow;
     /** Whether that bar floats as a rounded pill this pass (#124). */
     private static boolean floatingBarNow;
+    /** Whether the current pass has See-through status bar on, for the main feed. */
+    private static boolean seeThroughStatusBarNow;
+    private static boolean commentsOpenNow;
+    private static int statusBarHeightNow;
 
     /**
      * Whether the current pass is in Clear display with the fade between 0 and 100 (#84). The
@@ -616,6 +620,10 @@ public final class VideoOverlayHider {
             // The main feed's video goes up under a see-through status bar: the spacer TikTok keeps
             // for the bar above each video goes, as it does with the bar hidden, which wins (#145).
             boolean seeThroughStatusBar = Settings.SEE_THROUGH_STATUS_BAR.get() && !detailPager && !statusBar;
+            boolean commentsOpen = FeedVisibility.isCommentSheetVisible(activity);
+            seeThroughStatusBarNow = seeThroughStatusBar;
+            commentsOpenNow = commentsOpen;
+            statusBarHeightNow = SeeThroughStatusBar.getStatusBarHeight(activity);
             // The bottom bar goes clear and the spacer under each video goes, on the main feed
             // only: the opened-post pager has no tab bar (#145).
             boolean seeThroughBar = Settings.SEE_THROUGH_BOTTOM_BAR.get() && !detailPager;
@@ -690,8 +698,8 @@ public final class VideoOverlayHider {
                 wanted[DETAIL_SEARCH_BOX_TARGET] = detailSearchBox;
                 wanted[STATUS_BAR_SPACER_TARGET] = statusBar || seeThroughStatusBar;
                 wanted[STATUS_BAR_SCRIM_TARGET] = statusBar || seeThroughStatusBar;
-                // Grown, not hidden: see SeeThroughStatusBar.fill.
-                wanted[PLAYER_VIEW_TARGET] = seeThroughStatusBar;
+                // Grown, not hidden: see SeeThroughStatusBar.fill. Yields when comments sheet is open to prevent flicker.
+                wanted[PLAYER_VIEW_TARGET] = seeThroughStatusBar && !commentsOpen;
                 wanted[BOTTOM_SPACER_TARGET] = seeThroughBar && SeeThroughBottomBar.collapseAllowed();
                 for (int i = 0; i < RAIL_BUTTON_IDS.length; i++) {
                     wanted[RAIL_TARGET_START + i] = rail[i] || carryHides;
@@ -1892,6 +1900,20 @@ public final class VideoOverlayHider {
                             continue;
                         }
                         if (target == BOTTOM_TABS_DIVIDER_TARGET) setTransparent(view, false);
+                        if (target == BOTTOM_TABS_TARGET || target == BOTTOM_TABS_DIVIDER_TARGET) {
+                            float bottomShift = 0f;
+                            if (seeThroughStatusBarNow && !commentsOpenNow) {
+                                String style = Settings.STATUS_BAR_STYLE.get();
+                                if (Settings.STATUS_BAR_STYLE_SHIFT.equals(style)) {
+                                    bottomShift = statusBarHeightNow / 2f;
+                                } else if (Settings.STATUS_BAR_STYLE_SHIFT_FULL.equals(style)) {
+                                    bottomShift = (float) statusBarHeightNow;
+                                }
+                            }
+                            if (view.getTranslationY() != -bottomShift) {
+                                view.setTranslationY(-bottomShift);
+                            }
+                        }
                         // The Following stories pill is the strip's neighbour at the top of the
                         // feed, so it fades with the tabs; it was only ever hidden (#84).
                         setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));

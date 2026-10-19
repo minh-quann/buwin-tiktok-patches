@@ -863,11 +863,13 @@ public class Settings extends BaseSettings {
      */
     public static final BooleanSetting SEE_THROUGH_STATUS_BAR = new BooleanSetting("see_through_status_bar", FALSE);
     public static final String STATUS_BAR_STYLE_SHIFT = "shift";
+    public static final String STATUS_BAR_STYLE_SHIFT_FULL = "shift_full";
     public static final String STATUS_BAR_STYLE_GRADIENT = "gradient";
     public static final String STATUS_BAR_STYLE_SCALE = "scale";
     /**
      * How the video and status bar blend together when See-through status bar is on:
-     * - "shift": Shifts video upwards to cover the status bar without cropping horizontal content.
+     * - "shift": Shifts video upwards to cover the status bar and lifts bottom bar by half (Plan A).
+     * - "shift_full": Shifts video upwards and lifts bottom bar by full status bar height (Plan B).
      * - "gradient": Keeps video centered with a smooth ambient dark-to-transparent scrim over the bar.
      * - "scale": Scales video up (1.4x) to fill entire screen vertically and horizontally.
      */
