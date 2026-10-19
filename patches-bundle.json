@@ -1,0 +1,7 @@
+{
+  "created_at": "2026-10-18T21:20:00",
+  "description": "Buwin v0.75.0 - Bản vá tối ưu cho TikTok 47.1.4 trên Honor Magic 9 Pro Max (1320x2868 sw400dp 120Hz).\n- Nút gạt chuyển đổi hình viên thuốc chuẩn InsetDrawable: rãnh 51x31dp bo cong 16dp, nút tròn trắng 27dp cách đều 4 phía 2dp.\n- Thanh nổi điều hướng Capsule Dock: bo cong mềm mại 28dp, đệm lề 16dp hai bên thoáng đãng, nền kính mờ phản quang sang trọng.\n- Triệt tiêu 100% hiện tượng giật giao diện khi cuộn video feed bằng cách khóa cứng trạng thái ẩn đệm chân trang (zero-jitter layout).",
+  "download_url": "https://github.com/minh-quann/buwin-tiktok-patches/releases/download/v0.75.0/buwin-patches-0.75.0.mpp",
+  "signature_download_url": "",
+  "version": "0.75.0"
+}
