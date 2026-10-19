@@ -5,6 +5,7 @@
 package app.morphe.extension.tiktok.feed;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -55,13 +56,17 @@ public final class SeeThroughStatusBar {
 
         if (wanted) {
             if (color != Color.TRANSPARENT) {
-                // TikTok's own color, kept even when it set a new one while the bar was clear.
-                CLEARED.put(window, color);
+                // Keep previous non-transparent color
+                if (!CLEARED.containsKey(window)) {
+                    CLEARED.put(window, color);
+                }
                 window.setStatusBarColor(Color.TRANSPARENT);
             }
         } else {
             Integer own = CLEARED.remove(window);
-            if (own != null && color == Color.TRANSPARENT) window.setStatusBarColor(own);
+            if (own != null && color == Color.TRANSPARENT) {
+                window.setStatusBarColor(own);
+            }
         }
 
         updateGradientScrim(activity, isGradient);
@@ -76,7 +81,7 @@ public final class SeeThroughStatusBar {
 
         View scrim = decor.findViewWithTag(SCRIM_TAG);
         if (!visible) {
-            if (scrim != null) {
+            if (scrim != null && scrim.getVisibility() != View.GONE) {
                 scrim.setVisibility(View.GONE);
             }
             return;
@@ -112,22 +117,24 @@ public final class SeeThroughStatusBar {
                 lp.height = scrimHeight;
                 scrim.setLayoutParams(lp);
             }
-            scrim.setVisibility(View.VISIBLE);
-            scrim.bringToFront();
+            if (scrim.getVisibility() != View.VISIBLE) {
+                scrim.setVisibility(View.VISIBLE);
+            }
         }
     }
 
-    private static int getStatusBarHeight(Activity activity) {
+    static int getStatusBarHeight(Context context) {
+        if (context == null) return 0;
         int height = 0;
-        int resId = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
+        int resId = context.getResources().getIdentifier("status_bar_height", "dimen", "android");
         if (resId > 0) {
             try {
-                height = activity.getResources().getDimensionPixelSize(resId);
+                height = context.getResources().getDimensionPixelSize(resId);
             } catch (Exception ignored) {
             }
         }
         if (height <= 0) {
-            float density = activity.getResources().getDisplayMetrics().density;
+            float density = context.getResources().getDisplayMetrics().density;
             height = (int) (32 * density);
         }
         return height;
@@ -151,36 +158,55 @@ public final class SeeThroughStatusBar {
         boolean doShift = wanted && Settings.STATUS_BAR_STYLE_SHIFT.equals(style);
 
         ViewGroup group = (ViewGroup) player;
-        boolean surfaces = false;
+        View surface = null;
         for (int i = 0, count = group.getChildCount(); i < count; i++) {
-            View surface = group.getChildAt(i);
-            if (!(surface instanceof SurfaceView) && !(surface instanceof TextureView)) continue;
-            surfaces = true;
-            if (doScale) {
+            View child = group.getChildAt(i);
+            if (child instanceof SurfaceView || child instanceof TextureView) {
+                surface = child;
+                break;
+            }
+        }
+
+        ViewParent space = player.getParent();
+        boolean spaceValid = space instanceof View;
+        int spaceHeight = spaceValid ? ((View) space).getHeight() : group.getHeight();
+
+        if (doScale) {
+            // Scale mode (1.4x)
+            shift(player, 0f);
+            if (surface != null) {
                 shift(surface, 0f);
                 grow(surface, fillScale(group.getHeight(), surface));
-            } else if (doShift) {
+            } else if (spaceValid) {
+                grow(player, fillScale(spaceHeight, player, true));
+            }
+        } else if (doShift) {
+            // Shift mode: keep 1:1 scale, shift video upwards so top reaches status bar area,
+            // leaving a black border at the bottom near the bottom navigation bar.
+            if (surface != null) {
                 grow(surface, 1f);
-                shift(surface, -computeShift(group.getHeight(), surface, false));
+                if (surface.getTop() > 0 && group.getHeight() > surface.getHeight()) {
+                    float sShift = computeShift(surface, group.getHeight());
+                    shift(surface, -sShift);
+                    shift(player, 0f);
+                } else {
+                    shift(surface, 0f);
+                    float pShift = computeShift(player, spaceHeight);
+                    shift(player, -pShift);
+                }
             } else {
+                grow(player, 1f);
+                float pShift = computeShift(player, spaceHeight);
+                shift(player, -pShift);
+            }
+        } else {
+            // Default / Gradient mode: restore 1:1 scale and 0 translation
+            grow(player, 1f);
+            shift(player, 0f);
+            if (surface != null) {
                 grow(surface, 1f);
                 shift(surface, 0f);
             }
-        }
-        // A player this grew keeps getting a pass after a surface shows up in it, so it goes back.
-        if (surfaces && !FILLED.containsKey(player) && !SHIFTED.containsKey(player)) return;
-        ViewParent space = player.getParent();
-        boolean spaceValid = space instanceof View;
-        int spaceHeight = spaceValid ? ((View) space).getHeight() : 0;
-        if (doScale) {
-            shift(player, 0f);
-            grow(player, (!surfaces && spaceValid) ? fillScale(spaceHeight, player, true) : 1f);
-        } else if (doShift) {
-            grow(player, 1f);
-            shift(player, (!surfaces && spaceValid) ? -computeShift(spaceHeight, player, true) : 0f);
-        } else {
-            grow(player, 1f);
-            shift(player, 0f);
         }
     }
 
@@ -254,25 +280,35 @@ public final class SeeThroughStatusBar {
 
     /**
      * Computes the vertical distance (pixels) to shift {@code picture} upwards so that its
-     * top edge meets the top of {@code spaceHeight} without scaling or cropping side content.
+     * top edge meets the top of the screen/container, leaving room at the bottom.
      */
-    static float computeShift(int spaceHeight, View picture, boolean moved) {
+    static float computeShift(View picture, int spaceHeight) {
         int width = picture.getWidth();
         int height = picture.getHeight();
-        if (width <= 0 || height <= width) return 0f;
-        if (spaceHeight <= height) return 0f;
+        if (width <= 0 || height <= 0) return 0f;
+        // Don't shift landscape videos (keep them centered)
+        if (width > height) return 0f;
 
         Float myShift = SHIFTED.get(picture);
-        float otherOffset = moved ? (picture.getTranslationY() - (myShift != null ? myShift : 0f)) : 0f;
-        float top = picture.getTop() + otherOffset;
-        float bottom = spaceHeight - picture.getBottom() - otherOffset;
-        if (top <= 0f) return 0f;
-        if (moved) {
-            if (bottom < 0f) return 0f;
+        float currentShift = myShift != null ? myShift : 0f;
+        float actualTranslation = picture.getTranslationY() - currentShift;
+        float top = picture.getTop() + actualTranslation;
+
+        int statusBarHeight = getStatusBarHeight(picture.getContext());
+
+        // If the view has an explicit top offset from its layout, shift by that top offset
+        // so its top edge reaches 0 (the top of the container/screen).
+        if (top > 0f && top < spaceHeight * 0.45f) {
             return top;
         }
-        if (Math.abs(top - bottom) > 60f) return 0f;
-        return top;
+
+        // If top offset is 0 or unmeasured, shift upwards by statusBarHeight to guarantee
+        // the video expands into the status bar area, leaving a black border at the bottom.
+        if (statusBarHeight > 0) {
+            return (float) statusBarHeight;
+        }
+
+        return 100f;
     }
 
     /** Whether a surface still carries a scale or translation this wrote, so the pass runs to put it back. */

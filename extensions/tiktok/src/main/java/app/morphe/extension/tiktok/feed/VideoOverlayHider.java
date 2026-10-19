@@ -788,7 +788,8 @@ public final class VideoOverlayHider {
 
             setStatusBarHidden(activity, statusBar);
             // Only while the feed is in front: the window's other pages keep the color TikTok gives them.
-            SeeThroughStatusBar.apply(activity, seeThroughStatusBar && FeedVisibility.isOnFeed(activity));
+            boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity);
+            SeeThroughStatusBar.apply(activity, seeThroughStatusBar && onFeed);
         } catch (Throwable ex) {
             Logger.printException(() -> "Video overlay hider failed", ex);
         }

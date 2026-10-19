@@ -202,6 +202,7 @@ public final class FeedVisibility {
         }
         if (homeTab.isShown() && !isScrolledAway(homeTab)) return homeTab.isSelected();
         if (cleared(activity, homeTab)) return true;
+        if (isCommentSheetVisible(activity)) return true;
         return isDetailVisible() && !isStoryVisible(activity);
     }
 
