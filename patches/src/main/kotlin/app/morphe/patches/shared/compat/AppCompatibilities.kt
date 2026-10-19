@@ -23,11 +23,14 @@ internal object AppCompatibilities {
     /** TikTok 47.4.3's version code. APKMirror carries its universal APK and a split bundle. */
     const val TIKTOK_4743_VERSION_CODE = 2024704030
 
+    /** TikTok 47.1.4's version code. */
+    const val TIKTOK_4714_VERSION_CODE = 2024701040
+
     /** The version codes of every declared TikTok build. */
-    val TIKTOK_VERSION_CODES = setOf(TIKTOK_4743_VERSION_CODE)
+    val TIKTOK_VERSION_CODES = setOf(TIKTOK_4743_VERSION_CODE, TIKTOK_4714_VERSION_CODE)
 
     /**
-     * Targets: TikTok 47.4.3 only.
+     * Targets: TikTok 47.4.3 and 47.1.4 builds.
      */
     fun tiktok(): Array<Compatibility> = arrayOf(
         Compatibility(
@@ -37,6 +40,7 @@ internal object AppCompatibilities {
             signatures = setOf(TIKTOK_SIGNER_SHA256),
             targets = listOf(
                 AppTarget(version = "47.4.3", versionCode = TIKTOK_4743_VERSION_CODE),
+                AppTarget(version = "47.1.4", versionCode = TIKTOK_4714_VERSION_CODE),
             ),
         ),
     )
