@@ -39,9 +39,4 @@ public final class LaunchCrashCleanup {
         System.arraycopy(BUWIN_FILES, 0, joined, kept.length, BUWIN_FILES.length);
         return joined;
     }
-
-    /** Compatibility alias for patches or bytecode calling keepHushfeedFiles. */
-    public static String[] keepHushfeedFiles(String[] kept) {
-        return keepBuwinFiles(kept);
-    }
 }
