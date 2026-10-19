@@ -6,15 +6,16 @@ package app.morphe.extension.tiktok.feed;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
+import android.view.Gravity;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.Window;
-
-import android.os.Build;
-import android.view.WindowManager;
+import android.widget.FrameLayout;
 
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -24,9 +25,12 @@ import app.morphe.extension.tiktok.settings.SettingsStatus;
 
 /**
  * Optimized for tall aspect-ratio displays (Honor/MagicOS 19.55:9 and high-res screens).
- * Expands video surfaces to cover status bar areas seamlessly without leaving hairline edge artifacts.
+ * Expands or shifts video surfaces to cover status bar areas seamlessly without losing side content,
+ * or overlays a YouTube-style ambient gradient scrim.
  */
 public final class SeeThroughStatusBar {
+    static final String SCRIM_TAG = "buwin_status_bar_gradient";
+
     /**
      * Increased fill scale threshold to accommodate ultra-tall aspect ratios (19.5:9 to 21:9).
      */
@@ -35,6 +39,8 @@ public final class SeeThroughStatusBar {
     private static final Map<Window, Integer> CLEARED = new WeakHashMap<>();
     /** Video surfaces and players this grew, with the scale it wrote. */
     private static final Map<View, Float> FILLED = new WeakHashMap<>();
+    /** Video surfaces and players this shifted, with the translationY it wrote. */
+    private static final Map<View, Float> SHIFTED = new WeakHashMap<>();
 
     private SeeThroughStatusBar() {
     }
@@ -44,15 +50,87 @@ public final class SeeThroughStatusBar {
         Window window = activity.getWindow();
         if (window == null) return;
         int color = window.getStatusBarColor();
+        String style = Settings.STATUS_BAR_STYLE.get();
+        boolean isGradient = wanted && Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
+
         if (wanted) {
-            if (color == Color.TRANSPARENT) return;
-            // TikTok's own color, kept even when it set a new one while the bar was clear.
-            CLEARED.put(window, color);
-            window.setStatusBarColor(Color.TRANSPARENT);
+            if (color != Color.TRANSPARENT) {
+                // TikTok's own color, kept even when it set a new one while the bar was clear.
+                CLEARED.put(window, color);
+                window.setStatusBarColor(Color.TRANSPARENT);
+            }
+        } else {
+            Integer own = CLEARED.remove(window);
+            if (own != null && color == Color.TRANSPARENT) window.setStatusBarColor(own);
+        }
+
+        updateGradientScrim(activity, isGradient);
+    }
+
+    private static void updateGradientScrim(Activity activity, boolean visible) {
+        Window window = activity.getWindow();
+        if (window == null) return;
+        View decorView = window.getDecorView();
+        if (!(decorView instanceof ViewGroup)) return;
+        ViewGroup decor = (ViewGroup) decorView;
+
+        View scrim = decor.findViewWithTag(SCRIM_TAG);
+        if (!visible) {
+            if (scrim != null) {
+                scrim.setVisibility(View.GONE);
+            }
             return;
         }
-        Integer own = CLEARED.remove(window);
-        if (own != null && color == Color.TRANSPARENT) window.setStatusBarColor(own);
+
+        int statusBarHeight = getStatusBarHeight(activity);
+        int scrimHeight = (int) (statusBarHeight * 1.8f);
+
+        if (scrim == null) {
+            scrim = new View(activity);
+            scrim.setTag(SCRIM_TAG);
+            scrim.setClickable(false);
+            scrim.setFocusable(false);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                scrim.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            }
+
+            GradientDrawable gradient = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0x99000000, 0x66000000, 0x22000000, 0x00000000}
+            );
+            scrim.setBackground(gradient);
+
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    scrimHeight,
+                    Gravity.TOP
+            );
+            decor.addView(scrim, params);
+        } else {
+            ViewGroup.LayoutParams lp = scrim.getLayoutParams();
+            if (lp != null && lp.height != scrimHeight) {
+                lp.height = scrimHeight;
+                scrim.setLayoutParams(lp);
+            }
+            scrim.setVisibility(View.VISIBLE);
+            scrim.bringToFront();
+        }
+    }
+
+    private static int getStatusBarHeight(Activity activity) {
+        int height = 0;
+        int resId = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) {
+            try {
+                height = activity.getResources().getDimensionPixelSize(resId);
+            } catch (Exception ignored) {
+            }
+        }
+        if (height <= 0) {
+            float density = activity.getResources().getDisplayMetrics().density;
+            height = (int) (32 * density);
+        }
+        return height;
     }
 
     /** Whether this has cleared the bar of {@code activity}'s window. */
@@ -62,37 +140,48 @@ public final class SeeThroughStatusBar {
     }
 
     /**
-     * One layout pass over a feed cell's player: while {@code wanted}, grows its video so a portrait
-     * picture covers the player top to bottom; otherwise puts back the scale this wrote. Every pass
-     * measures again, so a new video in a reused cell gets its own scale. A scale TikTok wrote
-     * itself is left alone.
-     *
-     * <p>Only the first video after a cold start plays in a surface of the player's own (#164).
-     * TikTok creates that one at launch, sized to the picture inside {@code player_view}. Every
-     * later cell takes its video view from a factory that, depending on TikTok's experiments, hands
-     * back a SurfaceView or a TextureView inside the player, or a SurfaceControl player (47.1.4's
-     * {@code X.1T9e}) whose view is {@code player_view} itself: the size TikTok works out for the
-     * picture goes on the player, and the picture is a layer that follows the player's place, size
-     * and scale. With no surface inside it, the player is the picture, and it grows inside the space
-     * around it instead. Fit the video to the screen wins: a picture it shrank to show whole isn't
-     * grown back.
+     * One layout pass over a feed cell's player: manages video size and position
+     * based on the selected {@link Settings#STATUS_BAR_STYLE}.
      */
     static void fill(View player, boolean wanted) {
         if (!(player instanceof ViewGroup)) return;
         if (wanted && fitWins()) wanted = false;
+        String style = Settings.STATUS_BAR_STYLE.get();
+        boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
+        boolean doShift = wanted && Settings.STATUS_BAR_STYLE_SHIFT.equals(style);
+
         ViewGroup group = (ViewGroup) player;
         boolean surfaces = false;
         for (int i = 0, count = group.getChildCount(); i < count; i++) {
             View surface = group.getChildAt(i);
             if (!(surface instanceof SurfaceView) && !(surface instanceof TextureView)) continue;
             surfaces = true;
-            grow(surface, wanted ? fillScale(group.getHeight(), surface) : 1f);
+            if (doScale) {
+                shift(surface, 0f);
+                grow(surface, fillScale(group.getHeight(), surface));
+            } else if (doShift) {
+                grow(surface, 1f);
+                shift(surface, -computeShift(group.getHeight(), surface, false));
+            } else {
+                grow(surface, 1f);
+                shift(surface, 0f);
+            }
         }
         // A player this grew keeps getting a pass after a surface shows up in it, so it goes back.
-        if (surfaces && !FILLED.containsKey(player)) return;
+        if (surfaces && !FILLED.containsKey(player) && !SHIFTED.containsKey(player)) return;
         ViewParent space = player.getParent();
-        boolean grows = wanted && !surfaces && space instanceof View;
-        grow(player, grows ? fillScale(((View) space).getHeight(), player, true) : 1f);
+        boolean spaceValid = space instanceof View;
+        int spaceHeight = spaceValid ? ((View) space).getHeight() : 0;
+        if (doScale) {
+            shift(player, 0f);
+            grow(player, (!surfaces && spaceValid) ? fillScale(spaceHeight, player, true) : 1f);
+        } else if (doShift) {
+            grow(player, 1f);
+            shift(player, (!surfaces && spaceValid) ? -computeShift(spaceHeight, player, true) : 0f);
+        } else {
+            grow(player, 1f);
+            shift(player, 0f);
+        }
     }
 
     /** Whether Fit the video to the screen is on, so a picture it shrank stays whole. */
@@ -120,6 +209,21 @@ public final class SeeThroughStatusBar {
         FILLED.put(view, scale);
     }
 
+    /** Writes {@code translationY} on {@code view} and tracks it. */
+    private static void shift(View view, float translationY) {
+        Float was = SHIFTED.get(view);
+        float current = view.getTranslationY();
+        if ((was == null ? 0f : was) == current) {
+            if (translationY == current) return;
+        }
+        view.setTranslationY(translationY);
+        if (translationY == 0f) {
+            SHIFTED.remove(view);
+            return;
+        }
+        SHIFTED.put(view, translationY);
+    }
+
     /** {@link #fillScale(int, View, boolean)} for a surface TikTok centered by its layout. */
     static float fillScale(int playerHeight, View surface) {
         return fillScale(playerHeight, surface, false);
@@ -134,9 +238,10 @@ public final class SeeThroughStatusBar {
         if (width <= 0 || height <= width) return 1f;
         if (spaceHeight <= height) return 1f;
 
-        float offset = moved ? picture.getTranslationY() : 0f;
-        float top = picture.getTop() + offset;
-        float bottom = spaceHeight - picture.getBottom() - offset;
+        Float myShift = SHIFTED.get(picture);
+        float otherOffset = moved ? (picture.getTranslationY() - (myShift != null ? myShift : 0f)) : 0f;
+        float top = picture.getTop() + otherOffset;
+        float bottom = spaceHeight - picture.getBottom() - otherOffset;
         if (moved) {
             if (top < 0f || bottom < 0f) return 1f;
             float scale = (Math.max(top, bottom) * 2f + height + 2f) / height;
@@ -147,8 +252,31 @@ public final class SeeThroughStatusBar {
         return scale > MAX_FILL_SCALE ? 1f : scale;
     }
 
-    /** Whether a surface still carries a scale this wrote, so the pass runs to put it back. */
+    /**
+     * Computes the vertical distance (pixels) to shift {@code picture} upwards so that its
+     * top edge meets the top of {@code spaceHeight} without scaling or cropping side content.
+     */
+    static float computeShift(int spaceHeight, View picture, boolean moved) {
+        int width = picture.getWidth();
+        int height = picture.getHeight();
+        if (width <= 0 || height <= width) return 0f;
+        if (spaceHeight <= height) return 0f;
+
+        Float myShift = SHIFTED.get(picture);
+        float otherOffset = moved ? (picture.getTranslationY() - (myShift != null ? myShift : 0f)) : 0f;
+        float top = picture.getTop() + otherOffset;
+        float bottom = spaceHeight - picture.getBottom() - otherOffset;
+        if (top <= 0f) return 0f;
+        if (moved) {
+            if (bottom < 0f) return 0f;
+            return top;
+        }
+        if (Math.abs(top - bottom) > 60f) return 0f;
+        return top;
+    }
+
+    /** Whether a surface still carries a scale or translation this wrote, so the pass runs to put it back. */
     static boolean anyFilled() {
-        return !FILLED.isEmpty();
+        return !FILLED.isEmpty() || !SHIFTED.isEmpty();
     }
 }

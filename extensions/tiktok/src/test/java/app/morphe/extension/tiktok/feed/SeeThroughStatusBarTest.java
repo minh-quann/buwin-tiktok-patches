@@ -55,6 +55,7 @@ public class SeeThroughStatusBarTest {
     @After
     public void tearDown() {
         Settings.SEE_THROUGH_STATUS_BAR.resetToDefault();
+        Settings.STATUS_BAR_STYLE.resetToDefault();
         Settings.HIDE_STATUS_BAR.resetToDefault();
         Settings.FIT_VIDEO_TO_SCREEN.resetToDefault();
         SettingsStatus.videoFitEnabled = false;
@@ -210,6 +211,7 @@ public class SeeThroughStatusBarTest {
             assertEquals("the switch is off by default", 1f, surface.getScaleY(), 0f);
 
             Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SCALE);
             VideoOverlayHider.applyTo(activity);
             float scale = surface.getScaleY();
             assertEquals(scale, surface.getScaleX(), 0f);
@@ -288,6 +290,7 @@ public class SeeThroughStatusBarTest {
             nextPlayer.setTranslationY(106f);
 
             Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SCALE);
             VideoOverlayHider.applyTo(activity);
             assertTrue("the first video stopped short of the top", 1968 * surface.getScaleY() >= 2181);
             float scale = nextPlayer.getScaleY();
@@ -340,6 +343,7 @@ public class SeeThroughStatusBarTest {
             SettingsStatus.videoFitEnabled = true;
             Settings.FIT_VIDEO_TO_SCREEN.save(true);
             Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SCALE);
 
             VideoOverlayHider.applyTo(activity);
             assertEquals("the fitted video was grown back over its sides", 1f, surface.getScaleY(), 0f);
@@ -413,4 +417,65 @@ public class SeeThroughStatusBarTest {
             assertEquals(OWN_BAR_COLOR, activity.getWindow().getStatusBarColor());
         }
     }
+
+    @Test
+    public void aPortraitVideoShiftsUpUnderTheClockWithoutCropping() {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup().visible()) {
+            Activity activity = controller.get();
+            Utils.setContext(activity);
+            feedCell(activity, View.INVISIBLE);
+            FrameLayout cell = activity.findViewById(CELL_ID);
+            FrameLayout player = new FrameLayout(activity);
+            player.setId(PLAYER_ID);
+            SurfaceView surface = new SurfaceView(activity);
+            player.addView(surface);
+            cell.addView(player, new FrameLayout.LayoutParams(1080, 2181));
+            showVideo(player, surface, 1107, 1968);
+            assertEquals("not TikTok's centered surface", 106, surface.getTop());
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SHIFT);
+            VideoOverlayHider.applyTo(activity);
+
+            // In shift mode, the video maintains 1:1 scale (no side cropping).
+            assertEquals("scaleX was modified", 1f, surface.getScaleX(), 0f);
+            assertEquals("scaleY was modified", 1f, surface.getScaleY(), 0f);
+            // The video shifts up by exactly surface.getTop() so the top touches the status bar edge.
+            assertEquals("surface was not shifted up to the top", -106f, surface.getTranslationY(), 0f);
+            assertEquals("top edge did not meet top of screen", 0f, surface.getTop() + surface.getTranslationY(), 0f);
+
+            // Turning off resets translation back to 0.
+            Settings.SEE_THROUGH_STATUS_BAR.save(false);
+            VideoOverlayHider.applyTo(activity);
+            assertEquals("off did not reset translation", 0f, surface.getTranslationY(), 0f);
+            assertFalse(SeeThroughStatusBar.anyFilled());
+        }
+    }
+
+    @Test
+    public void ambientGradientOverlayAppliesOnDecorView() {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup().visible()) {
+            Activity activity = controller.get();
+            Utils.setContext(activity);
+            feedCell(activity, View.INVISIBLE);
+            activity.getWindow().setStatusBarColor(OWN_BAR_COLOR);
+
+            Settings.SEE_THROUGH_STATUS_BAR.save(true);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_GRADIENT);
+            VideoOverlayHider.applyTo(activity);
+
+            View decor = activity.getWindow().getDecorView();
+            View scrim = decor.findViewWithTag(SeeThroughStatusBar.SCRIM_TAG);
+            assertTrue("scrim view was not added to decor", scrim != null);
+            assertEquals(View.VISIBLE, scrim.getVisibility());
+            assertEquals(Color.TRANSPARENT, activity.getWindow().getStatusBarColor());
+
+            // Turning off hides the scrim.
+            Settings.SEE_THROUGH_STATUS_BAR.save(false);
+            VideoOverlayHider.applyTo(activity);
+            assertEquals(View.GONE, scrim.getVisibility());
+            assertEquals(OWN_BAR_COLOR, activity.getWindow().getStatusBarColor());
+        }
+    }
 }
+

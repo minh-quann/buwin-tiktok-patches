@@ -627,6 +627,16 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     "Let the video reach the top of the screen on the main feed, with the clock and status icons over it. The tabs at the top stay where they are.",
                     Settings.SEE_THROUGH_STATUS_BAR
             ));
+            addPreference(new ChoicePreference(
+                    context,
+                    "Status bar style",
+                    Settings.STATUS_BAR_STYLE,
+                    new String[]{"Shift video up", "Ambient gradient", "Scale to fill"},
+                    new String[]{Settings.STATUS_BAR_STYLE_SHIFT, Settings.STATUS_BAR_STYLE_GRADIENT, Settings.STATUS_BAR_STYLE_SCALE}
+            ).withNote("How the video and status bar blend together:\n"
+                    + "• Shift video up: Moves the video up under the status bar without cropping side content (recommended for tall displays).\n"
+                    + "• Ambient gradient: Keeps video centered and blends the status bar with a soft YouTube-style gradient.\n"
+                    + "• Scale to fill: Scales the video 1.4x to fill the screen entirely (may crop edges)."));
             addPreference(new ChoicePreference(context, "Burn-in guard", Settings.BURN_IN_GUARD,
                     new String[]{"Off", "Dim when idle", "Dim when idle and shift"},
                     new String[]{BurnInGuard.OFF, BurnInGuard.DIM, BurnInGuard.DIM_AND_SHIFT})
