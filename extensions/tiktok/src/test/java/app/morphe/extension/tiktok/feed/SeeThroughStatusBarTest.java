@@ -538,17 +538,6 @@ public class SeeThroughStatusBarTest {
             player.setTranslationY(0f);
             SeeThroughStatusBar.fill(player, true);
             assertEquals("Status bar shift re-applied on comments dismiss", -106f, surface.getTranslationY(), 0f);
-
-            // With DISABLE_COMMENT_SHRINK enabled, shrinking is counteracted
-            Settings.DISABLE_COMMENT_SHRINK.save(true);
-            player.setScaleX(0.7f);
-            player.setScaleY(0.7f);
-            player.setTranslationY(-300f);
-            SeeThroughStatusBar.fill(player, true);
-            assertEquals("player scaleX restored", 1.0f, player.getScaleX(), 0f);
-            assertEquals("player scaleY restored", 1.0f, player.getScaleY(), 0f);
-            assertEquals("player translationY restored", 0f, player.getTranslationY(), 0f);
-            assertEquals("surface translation preserved", -106f, surface.getTranslationY(), 0f);
         }
     }
 }

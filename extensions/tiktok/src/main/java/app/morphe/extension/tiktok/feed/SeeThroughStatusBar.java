@@ -268,19 +268,17 @@ public final class SeeThroughStatusBar {
         ViewGroup group = (ViewGroup) player;
         View surface = findSurface(group);
 
-        boolean disableShrink = Settings.DISABLE_COMMENT_SHRINK.get();
-        if (disableShrink) {
-            // Keep the video full screen behind comments: cancel TikTok's shrink animation
-            if (player.getScaleX() != 1.0f || player.getTranslationY() != 0f || player.getTranslationX() != 0f) {
-                player.animate().cancel();
-                player.setScaleX(1.0f);
-                player.setScaleY(1.0f);
-                player.setTranslationX(0f);
-                player.setTranslationY(0f);
-            }
-        }
+        Activity activity = activityOf(player);
+        boolean commentsOpen = activity != null && FeedVisibility.isCommentSheetCoveringFeed(activity);
+        boolean scalingForComments = (player.getScaleX() < 0.98f && !FILLED.containsKey(player))
+                || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface));
 
-        boolean scalingForComments = !disableShrink && (player.getScaleX() < 0.98f && !FILLED.containsKey(player));
+        if (commentsOpen || scalingForComments) {
+            // While comments are actively covering the feed or animating, do not reset or fight TikTok's animation.
+            // When comments are dismissed past 75% screen height, isCommentSheetCoveringFeed returns false,
+            // allowing fill() to seamlessly resume edge-to-edge fill with zero status bar blackout.
+            return;
+        }
 
         String style = Settings.STATUS_BAR_STYLE.get();
         boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
@@ -297,7 +295,7 @@ public final class SeeThroughStatusBar {
             }
         }
         if (fullHeight <= 0) {
-            Activity activity = activityOf(player);
+            if (activity == null) activity = activityOf(player);
             if (activity != null && activity.getWindow() != null && activity.getWindow().getDecorView() != null) {
                 fullHeight = activity.getWindow().getDecorView().getHeight();
             }
@@ -354,24 +352,21 @@ public final class SeeThroughStatusBar {
                 float currentCenterY = topInParent(targetView, cell) + vHeight / 2f;
                 float shiftY = targetCenterY - currentCenterY;
 
+                android.util.Log.i("buwin", "ScaleToFill: scale=" + neededScale + ", shiftX=" + shiftX
+                        + ", shiftY=" + shiftY + ", targetH=" + targetHeight + ", vH=" + vHeight);
+
                 if (surface != null) {
-                    if (!scalingForComments) {
-                        if (SHIFTED.containsKey(player)) shift(player, 0f, 0f);
-                        if (FILLED.containsKey(player)) grow(player, 1f);
-                    }
+                    shift(player, 0f, 0f);
+                    grow(player, 1f);
                     shift(surface, shiftX, shiftY);
                     grow(surface, neededScale);
                 } else {
-                    if (!scalingForComments) {
-                        shift(player, shiftX, shiftY);
-                        grow(player, neededScale);
-                    }
+                    shift(player, shiftX, shiftY);
+                    grow(player, neededScale);
                 }
             } else {
-                if (!scalingForComments) {
-                    shift(player, 0f, 0f);
-                    grow(player, 1f);
-                }
+                shift(player, 0f, 0f);
+                grow(player, 1f);
                 if (surface != null) {
                     shift(surface, 0f, 0f);
                     grow(surface, 1f);
@@ -384,20 +379,16 @@ public final class SeeThroughStatusBar {
                 if (surface.getTop() > 0 && group.getHeight() > surface.getHeight()) {
                     float sShift = computeShift(surface, group.getHeight());
                     shift(surface, -sShift);
-                    if (!scalingForComments && SHIFTED.containsKey(player)) shift(player, 0f);
+                    shift(player, 0f);
                 } else {
                     shift(surface, 0f);
-                    if (!scalingForComments) {
-                        float pShift = computeShift(player, fullHeight);
-                        shift(player, -pShift);
-                    }
-                }
-            } else {
-                grow(player, 1f);
-                if (!scalingForComments) {
                     float pShift = computeShift(player, fullHeight);
                     shift(player, -pShift);
                 }
+            } else {
+                grow(player, 1f);
+                float pShift = computeShift(player, fullHeight);
+                shift(player, -pShift);
             }
         } else if (doShiftSplit) {
             // Shift Split mode: keep 1:1 scale, shift upwards halfway to balance top and bottom margins
@@ -406,20 +397,16 @@ public final class SeeThroughStatusBar {
                 if (surface.getTop() > 0 && group.getHeight() > surface.getHeight()) {
                     float sShift = computeShift(surface, group.getHeight()) / 2f;
                     shift(surface, -sShift);
-                    if (!scalingForComments && SHIFTED.containsKey(player)) shift(player, 0f);
+                    shift(player, 0f);
                 } else {
                     shift(surface, 0f);
-                    if (!scalingForComments) {
-                        float pShift = computeShift(player, fullHeight) / 2f;
-                        shift(player, -pShift);
-                    }
-                }
-            } else {
-                grow(player, 1f);
-                if (!scalingForComments) {
                     float pShift = computeShift(player, fullHeight) / 2f;
                     shift(player, -pShift);
                 }
+            } else {
+                grow(player, 1f);
+                float pShift = computeShift(player, fullHeight) / 2f;
+                shift(player, -pShift);
             }
         } else {
             // Default or comments open: restore 1:1 scale and 0 translation if previously modified
