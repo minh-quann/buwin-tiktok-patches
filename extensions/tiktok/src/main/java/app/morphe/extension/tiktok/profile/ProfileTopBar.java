@@ -8,6 +8,7 @@ package app.morphe.extension.tiktok.profile;
 
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.ImageView;
 
 import java.util.ArrayList;
@@ -47,6 +48,9 @@ public final class ProfileTopBar {
     /** Add friends buttons this class hid, with the visibility each had before. */
     private static final Map<View, Integer> FRIENDS_HIDDEN = new WeakHashMap<>();
 
+    /** Original layout heights of profile cover views before expanding to screen edge. */
+    private static final Map<View, Integer> ORIGINAL_COVER_HEIGHTS = new WeakHashMap<>();
+
     /** The last row shape logged, so a row that keeps its buttons is described once. */
     private static volatile String lastShape;
 
@@ -55,14 +59,20 @@ public final class ProfileTopBar {
 
     /** One pass over the window under {@code root}. */
     public static void apply(View root) {
+        if (root == null) return;
+        int rowId = identifier(root, END_ROW_IDS);
+        if (rowId != 0) {
+            fillProfile(root, rowId);
+        }
+
         boolean views = Settings.HIDE_PROFILE_VIEWS_BUTTON.get();
         boolean friends = Settings.HIDE_PROFILE_ADD_FRIENDS.get();
         if (!views) restore(VIEWS_HIDDEN);
         if (!friends) restore(FRIENDS_HIDDEN);
-        if ((!views && !friends) || root == null) return;
-        int rowId = identifier(root, END_ROW_IDS);
+        if (!views && !friends) return;
+        if (rowId == 0) return;
         int capsuleId = identifier(root, VIEWS_CAPSULE_IDS);
-        if (rowId == 0 || capsuleId == 0) return;
+        if (capsuleId == 0) return;
         List<ViewGroup> rows = new ArrayList<>();
         collect(root, rowId, rows);
         for (ViewGroup row : rows) {
@@ -76,6 +86,185 @@ public final class ProfileTopBar {
             } else {
                 logShape(row, entrance);
             }
+        }
+    }
+
+    /**
+     * Ensures profile header and background cover extend seamlessly to the top screen edge (y = 0),
+     * filling through and beyond the pill cutout on tall displays like Honor.
+     */
+    static void fillProfile(View root, int rowId) {
+        if (root == null || rowId == 0) return;
+        List<ViewGroup> rows = new ArrayList<>();
+        collect(root, rowId, rows);
+        for (ViewGroup row : rows) {
+            fillProfileHeader(root, row);
+        }
+    }
+
+    private static void fillProfileHeader(View root, ViewGroup row) {
+        try {
+            ViewParent p1 = row.getParent();
+            if (!(p1 instanceof ViewGroup)) return;
+            ViewGroup navBar = (ViewGroup) p1;
+
+            ViewParent p2 = navBar.getParent();
+            if (!(p2 instanceof ViewGroup)) return;
+            ViewGroup header = (ViewGroup) p2;
+
+            // Unclip all ancestors up to root so header and background can extend past container bounds to top edge
+            unclipAncestors(header, root);
+            if (header.getClipChildren()) header.setClipChildren(false);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP && header.getClipToPadding()) {
+                header.setClipToPadding(false);
+            }
+
+            // Find cover image or background view inside header (excluding navBar)
+            View cover = findCoverView(header, navBar);
+            if (cover != null) {
+                unclipAncestors(cover, root);
+                if (cover instanceof ViewGroup) {
+                    ViewGroup coverGroup = (ViewGroup) cover;
+                    if (coverGroup.getClipChildren()) coverGroup.setClipChildren(false);
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP && coverGroup.getClipToPadding()) {
+                        coverGroup.setClipToPadding(false);
+                    }
+                }
+
+                int unshiftedTop = topInParent(cover, root);
+                if (unshiftedTop > 0) {
+                    cover.setTranslationY(-unshiftedTop);
+
+                    ViewGroup.LayoutParams lp = cover.getLayoutParams();
+                    if (lp != null && lp.height > 0) {
+                        Integer baseH = ORIGINAL_COVER_HEIGHTS.get(cover);
+                        if (baseH == null) {
+                            baseH = lp.height;
+                            ORIGINAL_COVER_HEIGHTS.put(cover, baseH);
+                        }
+                        int targetH = baseH + unshiftedTop;
+                        if (lp.height != targetH) {
+                            lp.height = targetH;
+                            cover.setLayoutParams(lp);
+                        }
+                    }
+                    if (cover instanceof ImageView) {
+                        ((ImageView) cover).setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    } else if (cover instanceof ViewGroup) {
+                        ImageView inner = findFirstImageView((ViewGroup) cover);
+                        if (inner != null) {
+                            inner.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                            ViewGroup.LayoutParams innerLp = inner.getLayoutParams();
+                            if (innerLp != null && innerLp.height > 0 && cover.getLayoutParams() != null) {
+                                innerLp.height = cover.getLayoutParams().height;
+                                inner.setLayoutParams(innerLp);
+                            }
+                        }
+                    }
+                }
+            } else {
+                int hUnshiftedTop = topInParent(header, root);
+                if (hUnshiftedTop > 0) {
+                    header.setTranslationY(-hUnshiftedTop);
+                }
+            }
+
+            // Clean up any status bar scrim or shadow view in header that darkens the top
+            for (int i = 0, count = header.getChildCount(); i < count; i++) {
+                View child = header.getChildAt(i);
+                if (child == navBar || child == cover || isDescendant(child, navBar) || (cover != null && isDescendant(child, cover))) {
+                    continue;
+                }
+                // If it's a thin view at the top acting as status bar scrim/spacer
+                if (child.getHeight() > 0 && child.getHeight() <= 200
+                        && child.getTop() == 0 && child.getWidth() >= header.getWidth() * 0.8f) {
+                    if (child.getVisibility() == View.VISIBLE) {
+                        child.setVisibility(View.GONE);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static View findCoverView(ViewGroup header, ViewGroup navBar) {
+        View best = null;
+        long bestArea = 0;
+        int count = header.getChildCount();
+        for (int i = 0; i < count; i++) {
+            View child = header.getChildAt(i);
+            if (child == navBar || isDescendant(child, navBar)) continue;
+            if (child instanceof ImageView) {
+                return child;
+            }
+            if (child instanceof ViewGroup) {
+                ImageView inner = findFirstImageView((ViewGroup) child);
+                if (inner != null && child.getHeight() > navBar.getHeight()) {
+                    return child;
+                }
+            }
+            long area = (long) child.getWidth() * (long) child.getHeight();
+            if (area > bestArea && child.getHeight() > navBar.getHeight()) {
+                bestArea = area;
+                best = child;
+            }
+        }
+        return best;
+    }
+
+    private static ImageView findFirstImageView(ViewGroup group) {
+        int count = group.getChildCount();
+        for (int i = 0; i < count; i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof ImageView) return (ImageView) child;
+            if (child instanceof ViewGroup) {
+                ImageView found = findFirstImageView((ViewGroup) child);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isDescendant(View parent, View target) {
+        if (parent == target) return true;
+        if (parent instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) parent;
+            for (int i = 0, count = vg.getChildCount(); i < count; i++) {
+                if (isDescendant(vg.getChildAt(i), target)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static int topInParent(View target, View ancestor) {
+        int top = 0;
+        View current = target;
+        while (current != null && current != ancestor) {
+            top += current.getTop();
+            ViewParent p = current.getParent();
+            if (p instanceof View) {
+                current = (View) p;
+            } else {
+                break;
+            }
+        }
+        return top;
+    }
+
+    private static void unclipAncestors(View view, View limit) {
+        ViewParent p = view.getParent();
+        while (p instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) p;
+            if (vg.getClipChildren()) {
+                vg.setClipChildren(false);
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                if (vg.getClipToPadding()) {
+                    vg.setClipToPadding(false);
+                }
+            }
+            if (limit != null && vg == limit) break;
+            p = vg.getParent();
         }
     }
 

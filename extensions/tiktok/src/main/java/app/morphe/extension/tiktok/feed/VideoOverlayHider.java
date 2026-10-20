@@ -2313,16 +2313,11 @@ public final class VideoOverlayHider {
     }
 
     /**
-     * Gives a window this class let draw behind the cutout its default mode back, unless TikTok
-     * has set a mode of its own on it since.
+     * Preserves SHORT_EDGES cutout mode across window state changes so edge-to-edge
+     * remains seamless across all screens including Profile.
      */
     static void restoreCutoutMode(Window window, View decor) {
-        if (CUTOUT_OPENED.remove(decor) == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
-        WindowManager.LayoutParams attributes = window.getAttributes();
-        if (attributes.layoutInDisplayCutoutMode
-                != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) return;
-        attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
-        window.setAttributes(attributes);
+        CUTOUT_OPENED.remove(decor);
     }
 
     /**

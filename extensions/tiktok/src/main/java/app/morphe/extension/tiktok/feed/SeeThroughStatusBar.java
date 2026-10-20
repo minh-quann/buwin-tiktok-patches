@@ -115,6 +115,23 @@ public final class SeeThroughStatusBar {
             CLEARED.put(window, Color.TRANSPARENT);
         }
 
+        if (Build.VERSION.SDK_INT >= 28) {
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            if (attrs != null && attrs.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                attrs.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                window.setAttributes(attrs);
+            }
+        }
+
+        View decor = window.getDecorView();
+        if (decor != null) {
+            int currentVis = decor.getSystemUiVisibility();
+            int wantedVis = currentVis | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+            if (currentVis != wantedVis) {
+                decor.setSystemUiVisibility(wantedVis);
+            }
+        }
+
         updateGradientScrim(activity, isGradient);
     }
 
