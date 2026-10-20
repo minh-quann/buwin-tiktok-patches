@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
-import app.morphe.extension.tiktok.cleardisplay.RememberClearDisplayPatch;
 import app.morphe.extension.tiktok.settings.Settings;
 import app.morphe.extension.tiktok.settings.SettingsStatus;
 
@@ -309,19 +308,12 @@ public final class SeeThroughStatusBar {
 
         boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(player);
         int chin = indicatorActive ? 0 : SeeThroughBottomBar.getChinHeight(player.getContext());
-
-        boolean clearDisplay = RememberClearDisplayPatch.isClearDisplayNow()
-                || RememberClearDisplayPatch.isCarryingClear();
-
-        int targetHeight = fullHeight;
-        if (!clearDisplay) {
-            int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
-            targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
-        }
+        int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
+        int targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
         if (targetHeight <= 0) targetHeight = fullHeight;
 
         // Ensure the cell under the bottom bar is also solid black to prevent any leakage
-        int bottomBlackHeight = clearDisplay ? 0 : (fullHeight - targetHeight);
+        int bottomBlackHeight = fullHeight - targetHeight;
         if (cell != null) {
             SeeThroughBottomBar.updateCellChin(cell, wanted ? bottomBlackHeight : 0);
         }
