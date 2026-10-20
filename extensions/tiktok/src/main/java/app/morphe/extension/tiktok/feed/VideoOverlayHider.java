@@ -745,8 +745,9 @@ public final class VideoOverlayHider {
                     pairDetailCommentBar(hidden, TRAVERSAL.selected, ids, detailPager, stripForBar);
                     List<View> strips = selectedViews(found, TRAVERSAL.selected, DETAIL_COMMENT_STRIP_TARGET);
                     // Before the guard, so it measures the caption where this pass leaves it.
-                    liftWidgetLayers(strips, seeThroughBar, seeThroughBar
-                            ? identifier(activity, activity.getPackageName(), WIDGET_LAYER_ID) : 0, cellId);
+                    int chin = SeeThroughBottomBar.isSystemIndicatorActive(root) ? 0 : SeeThroughBottomBar.getChinHeight(root.getContext());
+                    int widgetLayerId = identifier(activity, activity.getPackageName(), WIDGET_LAYER_ID);
+                    liftWidgetLayers(root, strips, seeThroughBar, widgetLayerId, cellId, chin);
                     guardBottomSpacer(hidden, found, TRAVERSAL.selected, seeThroughBar);
                     gateClearControls(hidden, found, TRAVERSAL.selected, carry);
                     applySelectedTargets(ids, hidden, found, TRAVERSAL.selected,
@@ -1396,22 +1397,32 @@ public final class VideoOverlayHider {
 
     /**
      * Keeps the caption and the buttons where TikTok had them once See-through bottom bar gives
-     * the main feed's pager the strip's room (#145). The cells grow by the strip's height and
-     * everything in them laid out against the bottom would go down behind the tabs, so each
-     * cell's widget layer goes up by the same amount while the picture fills the room. Nothing
-     * moves until the column has actually been laid out without the strip, and a layer TikTok
-     * offsets itself is left to TikTok.
+     * the main feed's pager the strip's room (#145), or elevates them when the system navigation
+     * indicator is disabled so all bottom elements match the elevated bottom bar.
      */
-    private static void liftWidgetLayers(List<View> strips, boolean seeThroughBar, int layerId, int cellId) {
+    private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar, int layerId, int cellId, int chin) {
         List<View> lifted = new ArrayList<>();
-        if (seeThroughBar && layerId != 0 && cellId != 0) {
-            for (View strip : strips) {
-                float gained = roomGained(strip);
-                if (gained <= 0f) continue;
+        if (layerId != 0) {
+            float stripGained = 0f;
+            if (seeThroughBar && strips != null && !strips.isEmpty()) {
+                for (View strip : strips) {
+                    float gained = roomGained(strip);
+                    if (gained > stripGained) stripGained = gained;
+                }
+            }
+            float totalLift = stripGained + (float) chin;
+            if (totalLift > 0f) {
                 List<View> layers = new ArrayList<>();
-                collectWidgetLayers((View) strip.getParent(), layerId, cellId, 0, layers);
+                if (strips != null && !strips.isEmpty() && cellId != 0) {
+                    for (View strip : strips) {
+                        collectWidgetLayers((View) strip.getParent(), layerId, cellId, 0, layers);
+                    }
+                }
+                if (layers.isEmpty() && root != null) {
+                    layers.addAll(viewsWithId(root, layerId));
+                }
                 for (View layer : layers) {
-                    offsetOwned(WIDGETS_LIFTED, layer, -gained);
+                    offsetOwned(WIDGETS_LIFTED, layer, -totalLift);
                     lifted.add(layer);
                 }
             }
@@ -1918,6 +1929,11 @@ public final class VideoOverlayHider {
                             setTransparent(view, false);
                             setFaded(view, fadeLevel, fadedClear);
                         }
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                        float targetY = -chin;
+                        if (view.getTranslationY() != targetY) {
+                            view.setTranslationY(targetY);
+                        }
                     } else if (target == TOP_SEARCH_BAR_TARGET || target == TOP_SEARCH_SCRIM_TARGET) {
                         // The way back out of the page: faded like the tabs, never past the floor,
                         // and out of sight only until TikTok's own clear lands on the page.
@@ -1932,9 +1948,20 @@ public final class VideoOverlayHider {
                         setFaded(view, wanted ? 100 : fadeLevel, fadedClear && !wanted);
                         TapThroughControls.mark(view, !wanted && fadedClear);
                         setHidden(view, wanted);
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                        float targetY = -chin;
+                        if (view.getTranslationY() != targetY) {
+                            view.setTranslationY(targetY);
+                        }
                     } else if (target == LOADING_LINE_TARGET) {
                         android.view.ViewParent frame = view.getParent();
-                        setTransparent(frame instanceof View ? (View) frame : view, wanted);
+                        View targetView = frame instanceof View ? (View) frame : view;
+                        setTransparent(targetView, wanted);
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(targetView) ? 0 : SeeThroughBottomBar.getChinHeight(targetView.getContext());
+                        float targetY = -chin;
+                        if (targetView.getTranslationY() != targetY) {
+                            targetView.setTranslationY(targetY);
+                        }
                     } else if (target == ANCHOR_TARGET || target == MUSIC_COVER_TARGET
                             || target == SEARCH_BAR_TARGET) {
                         // 47.1.4 keeps the caption frame, the music disc and the search bar
@@ -1944,6 +1971,13 @@ public final class VideoOverlayHider {
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone, View.INVISIBLE);
+                        if (WIDGETS_LIFTED.isEmpty()) {
+                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            float targetY = -chin;
+                            if (view.getTranslationY() != targetY) {
+                                view.setTranslationY(targetY);
+                            }
+                        }
                     } else if (target == ACTION_BAR_TARGET) {
                         // The rail's column. Fully faded it goes the way Clear display takes it,
                         // so nothing invisible takes a tap.
@@ -1951,6 +1985,13 @@ public final class VideoOverlayHider {
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone);
+                        if (WIDGETS_LIFTED.isEmpty()) {
+                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            float targetY = -chin;
+                            if (view.getTranslationY() != targetY) {
+                                view.setTranslationY(targetY);
+                            }
+                        }
                     } else if (target >= RAIL_TARGET_START && target < STATUS_BAR_SPACER_TARGET) {
                         boolean gone = wanted || fadeLevel == 0;
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
@@ -1973,7 +2014,13 @@ public final class VideoOverlayHider {
                             continue;
                         }
                         if (target == BOTTOM_TABS_DIVIDER_TARGET) setTransparent(view, false);
-                        if (target == BOTTOM_TABS_TARGET || target == BOTTOM_TABS_DIVIDER_TARGET) {
+                        if (target == BOTTOM_TABS_DIVIDER_TARGET) {
+                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            float targetY = -chin;
+                            if (view.getTranslationY() != targetY) {
+                                view.setTranslationY(targetY);
+                            }
+                        } else if (target == BOTTOM_TABS_TARGET) {
                             if (view.getTranslationY() != 0f) {
                                 view.setTranslationY(0f);
                             }
@@ -1985,7 +2032,31 @@ public final class VideoOverlayHider {
                     } else if (target == BOTTOM_SPACER_TARGET) {
                         SeeThroughBottomBar.adjustBottomSpacerChin(view);
                         setHidden(view, wanted);
-                    } else setHidden(view, wanted);
+                    } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET
+                            || target == CLEAR_PHOTO_EXIT_TARGET) {
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                        float targetY = -chin;
+                        if (view.getTranslationY() != targetY) {
+                            view.setTranslationY(targetY);
+                        }
+                        setHidden(view, wanted);
+                    } else if (target == DETAIL_COMMENT_STRIP_TARGET) {
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                        float targetY = -chin;
+                        if (view.getTranslationY() != targetY) {
+                            view.setTranslationY(targetY);
+                        }
+                        setHidden(view, wanted);
+                    } else {
+                        if ((target == CAPTION_TARGET || target == MUSIC_TARGET) && WIDGETS_LIFTED.isEmpty()) {
+                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            float targetY = -chin;
+                            if (view.getTranslationY() != targetY) {
+                                view.setTranslationY(targetY);
+                            }
+                        }
+                        setHidden(view, wanted);
+                    }
                 }
             // A survey is content TikTok inserts only on selected posts. Its absence from an
             // ordinary feed cell says nothing about whether this build still has the anchor.
