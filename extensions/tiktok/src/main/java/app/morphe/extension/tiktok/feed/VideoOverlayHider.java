@@ -807,6 +807,15 @@ public final class VideoOverlayHider {
             }
             SeeThroughBottomBar.updateChinOverlay(activity);
 
+            try {
+                View shrinkScrim = activity.findViewById(0x7f0a78e4);
+                if (shrinkScrim != null) {
+                    if (shrinkScrim.getVisibility() != View.GONE) shrinkScrim.setVisibility(View.GONE);
+                    if (shrinkScrim.getAlpha() != 0f) shrinkScrim.setAlpha(0f);
+                }
+            } catch (Throwable ignored) {
+            }
+
             setStatusBarHidden(activity, statusBar);
             // Only while the feed is in front: the window's other pages keep the color TikTok gives them.
             boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity);
@@ -2040,7 +2049,7 @@ public final class VideoOverlayHider {
                                 setHidden(view, true, View.INVISIBLE);
                             } else {
                                 fadeTabIcons(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
-                                setHidden(view, wanted);
+                                setHidden(view, wanted, View.INVISIBLE);
                             }
                         } else {
                             if (fadeLevel == 0) {
@@ -2048,7 +2057,7 @@ public final class VideoOverlayHider {
                                 setHidden(view, true, View.INVISIBLE);
                             } else {
                                 setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
-                                setHidden(view, wanted);
+                                setHidden(view, wanted, View.INVISIBLE);
                             }
                         }
                     } else if (target == BOTTOM_SPACER_TARGET) {
@@ -2363,8 +2372,10 @@ public final class VideoOverlayHider {
         }
 
         Integer before = HIDDEN_HERE.remove(view);
-        if (before != null && view.getVisibility() == hiddenAs) {
+        if (before != null) {
             view.setVisibility(before);
+        } else if (view.getVisibility() == View.INVISIBLE) {
+            view.setVisibility(View.VISIBLE);
         }
     }
 

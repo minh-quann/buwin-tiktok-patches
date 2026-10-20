@@ -794,12 +794,34 @@ public final class LiveStatusBar {
                 keepStripAway();
                 keepPageCoversAway();
                 if (!barHidden) keepControlsBelowBar();
+                fillLiveStream();
             } catch (Throwable failure) {
                 searches = MAX_SEARCHES;
                 coverSearches = MAX_SEARCHES;
                 videoId = 0;
                 HookStatus.threw(HOOK_FAMILY, "top strip", failure);
                 Logger.printException(() -> "Could not take away the LIVE room's top strip", failure);
+            }
+        }
+
+        private void fillLiveStream() {
+            Activity room = activity.get();
+            if (room == null) return;
+            View content = room.findViewById(android.R.id.content);
+            if (content == null || content.getHeight() == 0) return;
+
+            View targetStream = stream != null ? stream.get() : null;
+            if (targetStream == null && videoId() > 0) {
+                targetStream = content.findViewById(videoId());
+            }
+            if (targetStream == null) {
+                targetStream = SeeThroughStatusBar.findLiveSurface(content);
+            }
+            if (targetStream != null) {
+                View player = (targetStream instanceof ViewGroup) ? targetStream : (View) targetStream.getParent();
+                if (player instanceof ViewGroup) {
+                    SeeThroughStatusBar.fill(player, true);
+                }
             }
         }
 
@@ -1282,7 +1304,10 @@ public final class LiveStatusBar {
                 View content = page.findViewById(android.R.id.content);
                 View shown = content == null ? null : shownStream(content, videoId);
                 Room room = HIDDEN.get(page);
-                if (room != null && shown != null && room.stream != null && room.stream.get() == shown) return;
+                if (room != null && shown != null && room.stream != null && room.stream.get() == shown) {
+                    room.fillLiveStream();
+                    return;
+                }
                 if (room != null) show(page);
                 if (shown == null) return;
                 hide(page, hideBar, shown);

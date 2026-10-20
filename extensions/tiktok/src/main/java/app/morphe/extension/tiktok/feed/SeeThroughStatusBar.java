@@ -220,6 +220,33 @@ public final class SeeThroughStatusBar {
         return null;
     }
 
+    /** Finds the primary video SurfaceView or TextureView by largest rendered area. */
+    public static View findLiveSurface(View root) {
+        if (root == null) return null;
+        View best = null;
+        long bestArea = 0;
+        java.util.ArrayDeque<View> queue = new java.util.ArrayDeque<>();
+        queue.add(root);
+        int visited = 0;
+        while (!queue.isEmpty() && visited++ < 300) {
+            View v = queue.poll();
+            if (v == null) continue;
+            if (v instanceof SurfaceView || v instanceof TextureView) {
+                long area = (long) v.getWidth() * (long) v.getHeight();
+                if (area > bestArea) {
+                    bestArea = area;
+                    best = v;
+                }
+            } else if (v instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) v;
+                for (int i = 0, count = vg.getChildCount(); i < count; i++) {
+                    queue.add(vg.getChildAt(i));
+                }
+            }
+        }
+        return best;
+    }
+
     /** Finds the root view of the feed cell (view_rootview) or topmost laid-out ancestor. */
     static View findCellRoot(View view) {
         View current = view;
@@ -312,14 +339,12 @@ public final class SeeThroughStatusBar {
         View surface = findSurface(group);
 
         Activity activity = activityOf(player);
-        boolean commentsOpen = activity != null && FeedVisibility.isCommentSheetCoveringFeed(activity);
-        boolean scalingForComments = (player.getScaleX() < 0.98f && !FILLED.containsKey(player))
-                || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface));
+        boolean commentsVisible = activity != null && FeedVisibility.isCommentSheetVisible(activity);
+        View targetSurface = surface != null ? surface : player;
+        boolean hasFilled = FILLED.containsKey(targetSurface);
 
-        if (commentsOpen || scalingForComments) {
-            // While comments are actively covering the feed or animating, do not reset or fight TikTok's animation.
-            // When comments are dismissed past 75% screen height, isCommentSheetCoveringFeed returns false,
-            // allowing fill() to seamlessly resume edge-to-edge fill with zero status bar blackout.
+        if (commentsVisible && hasFilled) {
+            // While comment sheet is active, preserve existing fill transform on surface seamlessly.
             return;
         }
 
@@ -379,6 +404,16 @@ public final class SeeThroughStatusBar {
 
             if (vWidth > 0 && vHeight > 0) {
                 unclipAncestors(targetView, clearDisplay ? null : cell);
+                if (cell != null) {
+                    try {
+                        View shrinkScrim = cell.findViewById(0x7f0a78e4);
+                        if (shrinkScrim != null) {
+                            if (shrinkScrim.getVisibility() != View.GONE) shrinkScrim.setVisibility(View.GONE);
+                            if (shrinkScrim.getAlpha() != 0f) shrinkScrim.setAlpha(0f);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
 
                 // True Aspect Fill: guarantee video covers 100% width and 100% height with +2px anti-hairline margin
                 float scaleX = (float) (cellWidth + 2) / (float) vWidth;
