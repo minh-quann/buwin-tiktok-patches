@@ -47,12 +47,10 @@ public final class BurnInGuard {
     public static final String OFF = "off";
     public static final String DIM = "dim";
     public static final String DIM_AND_SHIFT = "dim_shift";
-    public static final String HIDE = "hide";
-    public static final String HIDE_AND_SHIFT = "hide_shift";
 
     /** How long the screen goes untouched before the controls dim. */
     static final long IDLE_AFTER_MS = 5_000L;
-    /** The opacity the controls dim to, as a percentage of what TikTok draws. */
+    /** Default opacity the controls dim to, as a percentage of what TikTok draws. */
     static final int IDLE_LEVEL = 25;
     /** How long the content stays in one place. */
     static final long SHIFT_EVERY_MS = 120_000L;
@@ -88,8 +86,7 @@ public final class BurnInGuard {
 
     static String mode() {
         String value = Settings.BURN_IN_GUARD.get();
-        return DIM.equals(value) || DIM_AND_SHIFT.equals(value)
-                || HIDE.equals(value) || HIDE_AND_SHIFT.equals(value) ? value : OFF;
+        return DIM.equals(value) || DIM_AND_SHIFT.equals(value) ? value : OFF;
     }
 
     /**
@@ -117,11 +114,10 @@ public final class BurnInGuard {
             fingerDown = false;
         }
         guarding = on;
-        boolean isHideMode = HIDE.equals(mode) || HIDE_AND_SHIFT.equals(mode);
-        int targetIdleLevel = isHideMode ? 0 : IDLE_LEVEL;
+        int targetIdleLevel = Math.max(0, Math.min(100, Settings.BURN_IN_IDLE_LEVEL.get()));
         boolean canDim = on && chosen > targetIdleLevel;
         dimmed = canDim && !fingerDown && now - touchedAt >= IDLE_AFTER_MS;
-        boolean shifting = on && (DIM_AND_SHIFT.equals(mode) || HIDE_AND_SHIFT.equals(mode));
+        boolean shifting = on && DIM_AND_SHIFT.equals(mode);
         place(activity, shifting, now);
         // No dim is timed while a finger is down; its lift asks for the pass that times one.
         schedule(Math.min(canDim && !dimmed && !fingerDown ? touchedAt + IDLE_AFTER_MS : Long.MAX_VALUE,
@@ -137,11 +133,31 @@ public final class BurnInGuard {
     private static void place(Activity activity, boolean shifting, long now) {
         View content = activity.findViewById(android.R.id.content);
         if (content == null) return;
-        // Never translate android.R.id.content: shifting the window content creates black void borders
-        // at the top and left screen edges on edge-to-edge video playback.
-        if (content.getTranslationX() != 0f) content.setTranslationX(0f);
-        if (content.getTranslationY() != 0f) content.setTranslationY(0f);
-        MOVED.remove(content);
+        float[] held = MOVED.get(content);
+        if (!shifting) {
+            if (held != null) {
+                MOVED.remove(content);
+                if (content.getTranslationX() == held[2]) content.setTranslationX(held[0]);
+                if (content.getTranslationY() == held[3]) content.setTranslationY(held[1]);
+            }
+            return;
+        }
+        float x = content.getTranslationX();
+        float y = content.getTranslationY();
+        if (held == null) {
+            held = new float[]{x, y, x, y};
+            MOVED.put(content, held);
+        } else {
+            // Something else wrote its own since the last pass; that's where the content is now.
+            if (x != held[2]) held[0] = x;
+            if (y != held[3]) held[1] = y;
+        }
+        int[] at = placeAt(now);
+        float step = STEP_DP * content.getResources().getDisplayMetrics().density;
+        held[2] = held[0] + at[0] * step;
+        held[3] = held[1] + at[1] * step;
+        if (x != held[2]) content.setTranslationX(held[2]);
+        if (y != held[3]) content.setTranslationY(held[3]);
     }
 
     private static void schedule(long next) {
@@ -176,6 +192,10 @@ public final class BurnInGuard {
         main.removeCallbacks(TICK);
         tickAt = -1L;
         main.post(TICK);
+        if (lifted) {
+            // Re-apply once the next video settling animation has completed after a swipe
+            main.postDelayed(TICK, 350L);
+        }
     }
 
     private static Handler handler() {

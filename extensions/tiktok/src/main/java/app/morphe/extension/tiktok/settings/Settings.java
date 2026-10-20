@@ -891,6 +891,19 @@ public class Settings extends BaseSettings {
      * couple of dp every two minutes. Over the feed and an opened video only.
      */
     public static final StringSetting BURN_IN_GUARD = new StringSetting("burn_in_guard", "off");
+    public static final IntegerSetting BURN_IN_IDLE_LEVEL = new IntegerSetting(
+            "burn_in_idle_level", 25, false, new Setting.Availability() {
+                @Override
+                public boolean isAvailable() {
+                    return !"off".equals(BURN_IN_GUARD.savedValue());
+                }
+
+                @Override
+                public java.util.List<Setting<?>> getParentSettings() {
+                    return java.util.Collections.singletonList(BURN_IN_GUARD);
+                }
+            }
+    ).withRange(0, 100);
     public static final BooleanSetting HIDE_SHARE_GUIDE = new BooleanSetting("hide_share_guide", FALSE);
     public static final BooleanSetting HIDE_RAIL_FOLLOW = new BooleanSetting("hide_rail_follow", FALSE);
     public static final BooleanSetting HIDE_RAIL_LIKE = new BooleanSetting("hide_rail_like", FALSE);

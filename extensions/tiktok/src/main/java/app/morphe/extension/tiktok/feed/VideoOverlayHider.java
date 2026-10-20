@@ -2415,7 +2415,14 @@ public final class VideoOverlayHider {
         for (int i = 0, count = vg.getChildCount(); i < count; i++) {
             View child = vg.getChildAt(i);
             if (child != null) {
-                setFaded(child, percent);
+                if (percent >= 100) {
+                    FADED_TO.remove(child);
+                    if (child.getAlpha() != 1.0f) {
+                        child.setAlpha(1.0f);
+                    }
+                } else {
+                    setFaded(child, percent);
+                }
             }
         }
     }
@@ -2444,7 +2451,7 @@ public final class VideoOverlayHider {
         if (percent >= 100) {
             if (held != null) {
                 FADED_TO.remove(view);
-                if (view.getAlpha() == held[1]) view.setAlpha(held[0]);
+                view.setAlpha(held[0] > 0f ? held[0] : 1f);
             }
             return;
         }
