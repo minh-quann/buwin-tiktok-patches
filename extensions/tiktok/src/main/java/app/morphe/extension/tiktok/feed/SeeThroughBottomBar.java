@@ -231,9 +231,8 @@ final class SeeThroughBottomBar {
     private static final String BLACK_CHIN_TAG = "buwin_black_chin_overlay";
 
     /**
-     * Ensures a solid black chin is painted at the bottom edge of the screen when the system
-     * navigation indicator is disabled ("bôi đen mép dưới màn hình"), preventing the next video
-     * in ViewPager from peeking through underneath the elevated bottom bar.
+     * Cleans up any legacy chin overlay that was previously attached to decorView so that
+     * it NEVER blocks dialogs, login sheets, comments, or other screens.
      */
     static void updateChinOverlay(Activity activity, boolean clearDisplay) {
         if (activity == null || activity.isFinishing()) return;
@@ -243,26 +242,48 @@ final class SeeThroughBottomBar {
         if (!(decor instanceof ViewGroup)) return;
         ViewGroup root = (ViewGroup) decor;
 
-        boolean indicatorActive = isSystemIndicatorActive(root);
-        int chin = (indicatorActive || clearDisplay) ? 0 : getChinHeight(activity);
-
         View chinView = root.findViewWithTag(BLACK_CHIN_TAG);
+        if (chinView != null) {
+            root.removeView(chinView);
+        }
+    }
+
+    /**
+     * Ensures a solid black chin is painted at the bottom edge of the feed cell (view_rootview)
+     * ONLY when the system navigation indicator is disabled, preventing the next video in
+     * ViewPager from peeking through. It is attached strictly to the feed cell so it NEVER
+     * appears on dialogs, login sheets, profile, inbox or search screens.
+     */
+    static void updateCellChin(View cell, int chin) {
+        if (!(cell instanceof ViewGroup)) return;
+        ViewGroup cellGroup = (ViewGroup) cell;
+        View chinView = cellGroup.findViewWithTag(BLACK_CHIN_TAG);
         if (chin <= 0) {
-            if (chinView != null && chinView.getVisibility() != View.GONE) {
-                chinView.setVisibility(View.GONE);
+            if (chinView != null) {
+                cellGroup.removeView(chinView);
             }
             return;
         }
 
         if (chinView == null) {
-            chinView = new View(activity);
+            chinView = new View(cell.getContext());
             chinView.setTag(BLACK_CHIN_TAG);
             chinView.setBackgroundColor(Color.BLACK);
             chinView.setClickable(false);
             chinView.setFocusable(false);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, chin, Gravity.BOTTOM);
-            root.addView(chinView, lp);
+            ViewGroup.LayoutParams lp;
+            if (cellGroup instanceof FrameLayout) {
+                lp = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, chin, Gravity.BOTTOM);
+            } else if (cellGroup instanceof android.widget.RelativeLayout) {
+                android.widget.RelativeLayout.LayoutParams rlp = new android.widget.RelativeLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, chin);
+                rlp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_BOTTOM);
+                lp = rlp;
+            } else {
+                lp = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, chin);
+            }
+            cellGroup.addView(chinView, lp);
         } else {
             ViewGroup.LayoutParams lp = chinView.getLayoutParams();
             if (lp != null && lp.height != chin) {
@@ -274,9 +295,6 @@ final class SeeThroughBottomBar {
             }
         }
         chinView.bringToFront();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            chinView.setElevation(9999f);
-        }
     }
 
 

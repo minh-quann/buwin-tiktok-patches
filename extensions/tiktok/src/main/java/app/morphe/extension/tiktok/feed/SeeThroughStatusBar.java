@@ -296,6 +296,11 @@ public final class SeeThroughStatusBar {
         int targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
         if (targetHeight <= 0) targetHeight = fullHeight;
 
+        // Apply black chin strictly inside the feed cell (view_rootview) so it never leaks onto dialogs or other screens
+        if (cell != null) {
+            SeeThroughBottomBar.updateCellChin(cell, wanted ? chin : 0);
+        }
+
         if (doScale) {
             // Scale mode: center vertically and scale to fill from top to targetHeight (above black chin)
             View targetView = surface != null ? surface : player;
