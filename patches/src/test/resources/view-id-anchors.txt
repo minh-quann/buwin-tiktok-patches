@@ -4,7 +4,7 @@
 #
 # source   the extension file, under extensions/tiktok/src/main/java/app/morphe/extension/tiktok/
 # group    the constant that holds the names, or "inline" for a name written into the lookup call
-# names    the names, in the order the code tries them. One written 47.1.4:g85 is that build's
+# names    the names, in the order the code tries them. One written 47.4.3:g8a is that build's
 #          name and resolves on it alone (BuildNames in the shared extension); one with no build
 #          in front is the same on every declared build. Each declared build is held to the
 #          names that apply on it, its owner and its tell

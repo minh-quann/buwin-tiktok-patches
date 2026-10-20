@@ -23,15 +23,10 @@ internal object AppCompatibilities {
     /** TikTok 47.4.3's version code. APKMirror carries its universal APK and a split bundle. */
     const val TIKTOK_4743_VERSION_CODE = 2024704030
 
-    /** TikTok 47.1.4's version code. */
-    const val TIKTOK_4714_VERSION_CODE = 2024701040
+    /** The version code of the sole declared TikTok build. */
+    val TIKTOK_VERSION_CODES = setOf(TIKTOK_4743_VERSION_CODE)
 
-    /** The version codes of every declared TikTok build. */
-    val TIKTOK_VERSION_CODES = setOf(TIKTOK_4743_VERSION_CODE, TIKTOK_4714_VERSION_CODE)
-
-    /**
-     * Targets: TikTok 47.4.3 and 47.1.4 builds.
-     */
+    /** TikTok 47.4.3 is the sole declared build. */
     fun tiktok(): Array<Compatibility> = arrayOf(
         Compatibility(
             name = "TikTok",
@@ -40,7 +35,6 @@ internal object AppCompatibilities {
             signatures = setOf(TIKTOK_SIGNER_SHA256),
             targets = listOf(
                 AppTarget(version = "47.4.3", versionCode = TIKTOK_4743_VERSION_CODE),
-                AppTarget(version = "47.1.4", versionCode = TIKTOK_4714_VERSION_CODE),
             ),
         ),
     )
@@ -50,13 +44,14 @@ internal object AppCompatibilities {
 
     /**
      * SHA-256 of PineDrama's signing certificate (CN=TikTok Drama), as `apksigner verify
-     * --print-certs` prints it for the APKMirror 47.1.4 bundle.
+     * --print-certs` prints it for PineDrama's APKMirror 47.1.4 bundle.
      */
     const val PINEDRAMA_SIGNER_SHA256 = "e97ca0c8835c5a9e4f7702a0382b103ede9c5d51e5194c8db54f4c8833f54e18"
 
     /**
-     * PineDrama 47.1.4's version code, the same as TikTok 47.1.4's. It is PineDrama's newest stable
-     * build on APKMirror, so PineDrama stays there while TikTok moves on.
+     * PineDrama 47.1.4's version code, which happens to match the former TikTok 47.1.4 target.
+     * It is PineDrama's newest stable build on APKMirror, so PineDrama stays there while TikTok
+     * moves on.
      */
     const val PINEDRAMA_4714_VERSION_CODE = 2024701040
 

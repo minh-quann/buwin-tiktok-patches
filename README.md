@@ -6,7 +6,7 @@
   <a href="https://www.android.com/"><img alt="Hệ điều hành" src="https://img.shields.io/badge/nền%20tảng-Android%2017%20%7C%20MagicOS-3ddc84.svg" /></a>
   <a href="https://github.com/MorpheApp/morphe-manager"><img alt="Morphe" src="https://img.shields.io/badge/tương%20thích-Morphe-00b894.svg" /></a>
   <a href="https://github.com/minh-quann/buwin-tiktok-patches/issues"><img alt="Thảo luận & Báo lỗi" src="https://img.shields.io/github/discussions/minh-quann/buwin-tiktok-patches?color=0969da" /></a>
-  <a href="https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/"><img alt="TikTok 47.1.4 / 47.4.3" src="https://img.shields.io/badge/TikTok-47.1.4%20%7C%2047.4.3-ff0050.svg" /></a>
+  <a href="https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/"><img alt="TikTok 47.4.3" src="https://img.shields.io/badge/TikTok-47.4.3-ff0050.svg" /></a>
 </p>
 
 # Buwin TikTok Patches
@@ -72,7 +72,7 @@ Các phím tắt Chặn, Ẩn, Chặn âm thanh và Không quan tâm mà Buwin c
 
 ## Hướng dẫn cài đặt từng bước
 
-1. **Chuẩn bị tệp APK TikTok gốc:** Tải tệp TikTok phiên bản **47.1.4** hoặc **47.4.3** từ APKMirror: [TikTok 47.1.4 Release APK](https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-1-4-release/) hoặc [TikTok 47.4.3 Release APK](https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-4-3-release/). Trên Android 11 trở lên, Morphe Manager sẽ tự động kiểm tra chữ ký gốc của TikTok để đảm bảo tệp nguyên bản chưa bị chỉnh sửa.
+1. **Chuẩn bị tệp APK TikTok gốc:** Tải TikTok phiên bản **47.4.3** từ APKMirror: [TikTok 47.4.3 Release APK](https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-4-3-release/). Trên Android 11 trở lên, Morphe Manager sẽ tự động kiểm tra chữ ký gốc của TikTok để đảm bảo tệp nguyên bản chưa bị chỉnh sửa.
 2. **Cài đặt Morphe Manager:** Sử dụng Morphe Manager phiên bản **1.34.0** trở lên. Trước khi vá, hãy vào **Cài đặt trong Morphe Manager > Tiến trình thực thi (Process runtime)** và tăng dung lượng bộ nhớ lên ít nhất **1,024 MB** để quá trình biên dịch không bị nghẽn RAM.
 3. **Thêm nguồn Buwin vào Morphe:**
    - Trên điện thoại, bạn có thể nhấn vào liên kết: [Thêm Buwin vào Morphe](https://morphe.software/add-source?github=minh-quann%2Fbuwin-tiktok-patches).
@@ -335,13 +335,9 @@ Các giao dịch nạp xu hoặc thanh toán trong app có thể bị từ chố
 ## Phiên bản và Thiết bị mục tiêu hỗ trợ
 
 - **Gói ứng dụng:** TikTok toàn cầu (`com.zhiliaoapp.musically`).
-- **Các phiên bản tương thích hoàn hảo:**
-  - [TikTok 47.1.4](https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-1-4-release/) (Phiên bản ổn định dài hạn được tối ưu hóa đặc biệt)
-  - [TikTok 47.4.3](https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-4-3-release/) (Phiên bản mới nhất)
+- **Phiên bản tương thích:** [TikTok 47.4.3](https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-4-3-release/).
 - **Kiến trúc vi xử lý:** `arm64-v8a` và `armeabi-v7a`, `nodpi`, `minSdk 23`
-- **Mã băm SHA-256 đối chiếu của APK gốc:**
-  - Phiên bản 47.1.4: `d475cfbc3205b958e370a2fdbf08ee90efeb36531988e0ec3531b7d519b7a4be`
-  - Phiên bản 47.4.3: `af7cbe2b00d33ff1339730f6abb8ed7e387a83b27ff2b16748b8f41e6fc87e0b`
+- **SHA-256 của APK TikTok 47.4.3 gốc:** `af7cbe2b00d33ff1339730f6abb8ed7e387a83b27ff2b16748b8f41e6fc87e0b`.
 - Hỗ trợ ứng dụng phim ngắn PineDrama phiên bản 47.1.4 (`com.ss.android.ttmd.video`).
 
 Kiểm tra mã băm tệp APK đã tải về trên máy tính bằng PowerShell:

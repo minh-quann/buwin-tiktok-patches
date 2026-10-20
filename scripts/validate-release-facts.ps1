@@ -234,7 +234,7 @@ $bundleDescription = [string]$bundle.description
 # legitimately name an older TikTok build, patch count or test count.
 $bundleFacts = ($bundleDescription -split '(?m)^### ', 2)[0]
 $publishedPatchMatch = [regex]::Match($bundleFacts, '\b(\d+) patches\b')
-# "TikTok 47.1.4", or with more than one target "TikTok 47.1.4 and 47.2.3".
+# "TikTok 47.4.3", or with more than one target "TikTok 47.4.3 and 47.5.0".
 $publishedTargetMatch = [regex]::Match($bundleFacts,
     'TikTok\s+(\d+(?:\.\d+)+(?:(?:,\s*|,?\s+and\s+)\d+(?:\.\d+)+)*)')
 # @() around the whole if: an if hands back one match as a plain string, and indexing that

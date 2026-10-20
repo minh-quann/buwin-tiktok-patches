@@ -18,7 +18,7 @@
 .EXAMPLE
     $env:BUWIN_WORKDIR = "C:\scratch"
     $env:BUWIN_JAVA = "C:\jdk-21\bin\java.exe"
-    $env:BUWIN_APK = "C:\fixtures\com.zhiliaoapp.musically_47.1.4.apk"
+    $env:BUWIN_APK = "C:\fixtures\com.zhiliaoapp.musically_47.4.3.apk"
     scripts/measure-patch-heap.ps1 settings:640m settings:768m all:768m
 #>
 [CmdletBinding()]

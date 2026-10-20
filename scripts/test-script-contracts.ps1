@@ -395,8 +395,8 @@ Assert-True ((@($target.PackageVersions) -join ',') -eq '47.4.3' -and $target.Pa
 Assert-True ((Format-VersionList -Versions @('47.0.3')) -eq '47.0.3' -and
     (Format-VersionList -Versions @('47.0.3', '47.1.3')) -eq '47.0.3 and 47.1.3' -and
     (Format-VersionList -Versions @('1.0', '2.0', '3.0')) -eq '1.0, 2.0 and 3.0') 'A version list was not written as a sentence.'
-$twoTargets = [pscustomobject]@{ PackageVersions = @('47.1.4', '47.2.3'); PackageVersion = '47.2.3' }
-Assert-True ((Get-DeclaredReportVersion -Report ([pscustomobject]@{ packageVersion = '47.1.4' }) -Target $twoTargets) -eq '47.1.4' -and
+$twoTargets = [pscustomobject]@{ PackageVersions = @('47.4.3', '47.5.0'); PackageVersion = '47.5.0' }
+Assert-True ((Get-DeclaredReportVersion -Report ([pscustomobject]@{ packageVersion = '47.4.3' }) -Target $twoTargets) -eq '47.4.3' -and
     (Get-DeclaredReportVersion -Report ([pscustomobject]@{ packageVersion = '47.4.3' }) -Target $target) -eq '47.4.3' -and
     (Get-DeclaredReportVersion -Report ([pscustomobject]@{ packageVersion = '47.0.3' }) -Target $target) -eq '47.4.3' -and
     (Get-DeclaredReportVersion -Report ([pscustomobject]@{ packageVersion = '47.2.3' }) -Target $target) -eq '47.4.3' -and
@@ -3513,7 +3513,7 @@ try {
         '*Refusing to keep runs*' 'A -KeepIn that is a junction was accepted.'
 
     # The pre-push gate's own folder: created, filled by a passing run, refreshed by the next.
-    $kept = Join-Path $keptRoot 'kept\47.1.4'
+    $kept = Join-Path $keptRoot 'kept\47.4.3'
     $claimed = Initialize-KeptRunDirectory -Path $kept -Inputs $keptInputs -RepositoryRoot $keptRepo
     Assert-True ($claimed -eq [System.IO.Path]::GetFullPath($kept)) "A fresh kept folder resolved to $claimed."
     foreach ($name in @('patched.apk', 'result.json', 'stamp.json')) {

@@ -27,7 +27,7 @@
     parameter once and refuses the second.
 
     scripts/build-release-receipt.ps1 -WorkDir C:\scratch `
-        -Fixture C:\fixtures\tiktok-47.1.4.apk,C:\fixtures\tiktok-47.1.4-merged.apk
+        -Fixture C:\fixtures\tiktok-47.4.3.apk,C:\fixtures\tiktok-47.4.3-merged.apk
 #>
 [CmdletBinding()]
 param(

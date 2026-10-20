@@ -254,7 +254,7 @@ class RuntimeViewIdAnchorsTest {
     ) {
         /**
          * The names the code resolves on [version], in its order: that build's own, written
-         * `47.1.4:g85`, and the real names with no build in front. BuildNames in the shared
+         * `47.4.3:g8a`, and the real names with no build in front. BuildNames in the shared
          * extension skips every other build's.
          */
         fun namesOn(version: String): List<String> = names.mapNotNull { name ->

@@ -104,12 +104,19 @@ final class SeeThroughBottomBar {
 
     /**
      * Checks if the device's navigation indicator / navigation bar is active (visible).
-     * Returns true if bottom inset > 0 (user has gesture indicator or 3-button nav enabled).
-     * Returns false if bottom inset == 0 (user disabled gesture indicator in system settings).
-     * Defaults to true if insets are not yet available (e.g. before attached or during unit tests).
+     * Returns true if indicator is shown (gesture indicator or 3-button nav enabled).
+     * Returns false if indicator is hidden (user disabled gesture indicator / immersive mode).
      */
     static boolean isSystemIndicatorActive(View view) {
-        if (view == null) return true;
+        if (view == null) return false;
+        Context ctx = view.getContext();
+        try {
+            int immersive = android.provider.Settings.Secure.getInt(
+                    ctx.getContentResolver(), "secure_gesture_navigation_immersive", -1);
+            if (immersive == 1) return false;
+            if (immersive == 0) return true;
+        } catch (Throwable ignored) {
+        }
         WindowInsets insets = null;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             insets = view.getRootWindowInsets();
@@ -124,33 +131,36 @@ final class SeeThroughBottomBar {
         }
         if (insets != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                return insets.getInsets(WindowInsets.Type.navigationBars()).bottom > 0;
+                return insets.isVisible(WindowInsets.Type.navigationBars())
+                        && insets.getInsets(WindowInsets.Type.navigationBars()).bottom > 0;
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 return insets.getSystemWindowInsetBottom() > 0;
             }
         }
-        return true;
+        return false;
     }
 
     /**
      * Returns the height (in pixels) of the navigation bar chin to reserve when the user
-     * has disabled the system gesture indicator (~22dp).
+     * has disabled the system gesture indicator (~21-22dp).
      */
     static int getChinHeight(Context context) {
         if (context == null) return 0;
         float density = context.getResources().getDisplayMetrics().density;
-        int defaultChin = Math.round(22 * density);
-        int resId = context.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        int resId = context.getResources().getIdentifier("navigation_bar_gesture_height", "dimen", "android");
+        if (resId <= 0) {
+            resId = context.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        }
         if (resId > 0) {
             try {
                 int navH = context.getResources().getDimensionPixelSize(resId);
-                if (navH > 0 && navH <= Math.round(32 * density)) {
+                if (navH > 0 && navH <= Math.round(48 * density)) {
                     return navH;
                 }
             } catch (Exception ignored) {
             }
         }
-        return defaultChin;
+        return Math.round(21 * density);
     }
 
     /**
@@ -204,10 +214,10 @@ final class SeeThroughBottomBar {
         if (lp != null) {
             Integer origH = ORIGINAL_SPACER_HEIGHT.get(spacer);
             if (origH == null) {
-                origH = lp.height > 0 ? lp.height : spacer.getHeight();
-                if (origH > 0) ORIGINAL_SPACER_HEIGHT.put(spacer, origH);
+                origH = lp.height >= 0 ? lp.height : Math.max(0, spacer.getHeight());
+                ORIGINAL_SPACER_HEIGHT.put(spacer, origH);
             }
-            if (origH != null && origH > 0) {
+            if (origH != null) {
                 int targetH = origH + chin;
                 if (lp.height != targetH) {
                     lp.height = targetH;

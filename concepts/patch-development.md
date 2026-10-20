@@ -20,8 +20,8 @@ Keep every Unreleased bullet under a `###` group. The release cutter preserves t
 | --- | --- |
 | App | Global TikTok |
 | Package | com.zhiliaoapp.musically |
-| Supported version | 47.1.4 |
-| Version code | 2024701040 |
+| Supported version | 47.4.3 |
+| Version code | 2024704030 |
 | APK signer SHA-256 | 9041803e91bcb814b4b4399fb5c85a91640b755e5e8ba76813814bf4cf2ab5ba |
 | Extension minimum Android API | 23 |
 
@@ -31,7 +31,7 @@ The target identity is centralized in [AppCompatibilities.kt](../patches/src/mai
 
 On 2026-10-09, a clean factory APK was downloaded from [TikTok's official Android download page](https://www.tiktok.com/download). It was TikTok 38.3.3, package com.zhiliaoapp.musically, version code 2023803030, minSdk 21, targetSdk 34, and 429,047,484 bytes. Its SHA-256 was AB8D9394D87CA046BDA8F49031791CFAF75588A0830B5D54766E1BCF8CCDD6BC. apksigner verified its official signer, which matches the certificate recorded for the supported target.
 
-That factory APK is useful for observing TikTok's unpatched onboarding and selected signed-in surfaces. It is not a patch fixture. Its version is far older than 47.1.4, so bytecode matches, resource IDs, and patch success on it say nothing about the supported target.
+That factory APK is useful for observing TikTok's unpatched onboarding and selected signed-in surfaces. It is not a patch fixture. Its version is far older than 47.4.3, so bytecode matches, resource IDs, and patch success on it say nothing about the supported target.
 
 ## Factory install observation
 
@@ -45,7 +45,7 @@ The factory APK was installed into a separate writable emulator data image. The 
 - Continue with Google
 - Already have an account? Log in
 
-The initial sign-up screen offered Skip, phone or email, Facebook, Google, and Log in. A later launch led to TikTok's birthday gate, with a Birthday field, month, day, and year picker labels, a disabled Continue button, and a Sign up action. The picker initially showed October 9, 2025. The clean pass ended there. The account holder later completed onboarding and sign-in on the visible emulator, which reached the For You feed and settings. That pass showed one in-feed video ad with an Ad label and Shop now button. It also exposed TikTok's ad, privacy, contact-sync, and content preference controls. No preferences were changed and no account-specific values were recorded. The birthday-gate screenshot and detailed route, tracking, and patch analysis are in [the TikTok app audit](tiktok-app-audit.md). These factory-install UI observations are from 38.3.3, not evidence about the supported 47.1.4 build. The separately labeled physical-device report below covers the later modified 47.1.4 installation.
+The initial sign-up screen offered Skip, phone or email, Facebook, Google, and Log in. A later launch led to TikTok's birthday gate, with a Birthday field, month, day, and year picker labels, a disabled Continue button, and a Sign up action. The picker initially showed October 9, 2025. The clean pass ended there. The account holder later completed onboarding and sign-in on the visible emulator, which reached the For You feed and settings. That pass showed one in-feed video ad with an Ad label and Shop now button. It also exposed TikTok's ad, privacy, contact-sync, and content preference controls. No preferences were changed and no account-specific values were recorded. The birthday-gate screenshot and detailed route, tracking, and patch analysis are in [the TikTok app audit](tiktok-app-audit.md). These factory-install UI observations are from 38.3.3, not evidence about the current 47.4.3 target. The separately labeled physical-device report below is historical evidence from a modified installation of the previous 47.1.4 target.
 
 ## Build and injection path
 
@@ -189,12 +189,12 @@ The compact status has Active, Paused and Restart pending text states. Tapping i
 
 The mockups establish hierarchy and category coverage. They are not evidence of native layout or device acceptance. Use the implementation's rendered screenshots and recorded checks for font scaling, accessibility, interaction and localization. Rendered checks cover both themes, navigation, translated text, twice the text size and right-to-left layout.
 
-The final signed build was exercised on a Galaxy S22 running Android 16 and TikTok 47.1.4 at 450dpi, in light mode with the default text size. The walkthrough visited all 24 surfaces above, including search and the creator editor. The final home and five hubs were recaptured after correcting icon scaling at phone density. Existing app data and settings were preserved. Dark mode and enlarged text were checked through the rendered suite. TalkBack interaction was not rerun for this refresh.
+The final signed build for release 0.75.0 was exercised on a Galaxy S22 running Android 16 and TikTok 47.1.4 at 450dpi, in light mode with the default text size. The walkthrough visited all 24 surfaces above, including search and the creator editor. The final home and five hubs were recaptured after correcting icon scaling at phone density. Existing app data and settings were preserved. Dark mode and enlarged text were checked through the rendered suite. TalkBack interaction was not rerun for this refresh.
 
 ## Adding or changing a patch
 
 1. Start from the exact patch name in patches-list.json. Read its Kotlin declaration, dependencies, runtime hook, tests, and the matching README entry.
-2. Confirm the behavior against the declared 47.1.4 APK. Record the package, version, and signer. Do not use the 38.3.3 factory APK as a bytecode or resource reference.
+2. Confirm the behavior against the declared 47.4.3 APK. Record the package, version, and signer. Do not use the 38.3.3 factory APK as a bytecode or resource reference.
 3. Put the patch in the closest existing feature package. Use a narrow fingerprint and validate the exact number or shape of matches. PatchContracts.kt provides helpers that fail with a patch-specific message when a match disappears, becomes ambiguous, or changes shape.
 4. Decide whether the control belongs in Manager at patch time or in Buwin settings at runtime. For a runtime switch, add its stable key and default in Settings.java, connect it to the category row, and inject a hook that reads the setting. Add translation entries when new setting text is introduced.
 5. Add a patch test for the selected bytecode or resource contract. Add a runtime test beside the Java feature when behavior can be exercised without TikTok's private runtime. Keep APK-dependent tests tied to the external fixture directory.
