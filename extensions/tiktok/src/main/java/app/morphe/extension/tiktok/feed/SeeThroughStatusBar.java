@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
+import app.morphe.extension.tiktok.cleardisplay.RememberClearDisplayPatch;
 import app.morphe.extension.tiktok.settings.Settings;
 import app.morphe.extension.tiktok.settings.SettingsStatus;
 
@@ -252,7 +253,7 @@ public final class SeeThroughStatusBar {
                     vg.setClipToPadding(false);
                 }
             }
-            if (vg == limit) break;
+            if (limit != null && vg == limit) break;
             p = vg.getParent();
         }
     }
@@ -308,12 +309,20 @@ public final class SeeThroughStatusBar {
 
         boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(player);
         int chin = indicatorActive ? 0 : SeeThroughBottomBar.getChinHeight(player.getContext());
-        int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
-        int targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
+
+        boolean clearDisplay = RememberClearDisplayPatch.isClearDisplayNow()
+                || RememberClearDisplayPatch.isCarryingClear();
+
+        int targetHeight = fullHeight;
+        if (!clearDisplay) {
+            int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
+            targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
+        }
         if (targetHeight <= 0) targetHeight = fullHeight;
 
         // Ensure the cell under the bottom bar is also solid black to prevent any leakage
-        int bottomBlackHeight = fullHeight - targetHeight;
+        // When in Clear Display, NEVER draw a black chin - video must fill the screen without obstructing bars
+        int bottomBlackHeight = clearDisplay ? 0 : (fullHeight - targetHeight);
         if (cell != null) {
             SeeThroughBottomBar.updateCellChin(cell, wanted ? bottomBlackHeight : 0);
         }
@@ -329,7 +338,7 @@ public final class SeeThroughStatusBar {
             if (cellWidth <= 0) cellWidth = player.getResources().getDisplayMetrics().widthPixels;
 
             if (vWidth > 0 && vHeight > 0) {
-                unclipAncestors(targetView, cell);
+                unclipAncestors(targetView, clearDisplay ? null : cell);
 
                 // True Aspect Fill: guarantee video covers 100% width and 100% height with +2px anti-hairline margin
                 float scaleX = (float) (cellWidth + 2) / (float) vWidth;

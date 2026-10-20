@@ -745,7 +745,7 @@ public final class VideoOverlayHider {
                     pairDetailCommentBar(hidden, TRAVERSAL.selected, ids, detailPager, stripForBar);
                     List<View> strips = selectedViews(found, TRAVERSAL.selected, DETAIL_COMMENT_STRIP_TARGET);
                     // Before the guard, so it measures the caption where this pass leaves it.
-                    int chin = SeeThroughBottomBar.isSystemIndicatorActive(root) ? 0 : SeeThroughBottomBar.getChinHeight(root.getContext());
+                    int chin = (SeeThroughBottomBar.isSystemIndicatorActive(root) || clearOn()) ? 0 : SeeThroughBottomBar.getChinHeight(root.getContext());
                     int widgetLayerId = identifier(activity, activity.getPackageName(), WIDGET_LAYER_ID);
                     liftWidgetLayers(root, strips, seeThroughBar, widgetLayerId, cellId, chin);
                     guardBottomSpacer(hidden, found, TRAVERSAL.selected, seeThroughBar);
@@ -1978,7 +1978,8 @@ public final class VideoOverlayHider {
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone, View.INVISIBLE);
                         if (WIDGETS_LIFTED.isEmpty()) {
-                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            int chin = (SeeThroughBottomBar.isSystemIndicatorActive(view) || clearOn())
+                                    ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                             float targetY = -chin;
                             if (view.getTranslationY() != targetY) {
                                 view.setTranslationY(targetY);
@@ -1992,7 +1993,8 @@ public final class VideoOverlayHider {
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone);
                         if (WIDGETS_LIFTED.isEmpty()) {
-                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            int chin = (SeeThroughBottomBar.isSystemIndicatorActive(view) || clearOn())
+                                    ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                             float targetY = -chin;
                             if (view.getTranslationY() != targetY) {
                                 view.setTranslationY(targetY);
@@ -2056,7 +2058,8 @@ public final class VideoOverlayHider {
                         setHidden(view, wanted);
                     } else {
                         if ((target == CAPTION_TARGET || target == MUSIC_TARGET) && WIDGETS_LIFTED.isEmpty()) {
-                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                            int chin = (SeeThroughBottomBar.isSystemIndicatorActive(view) || clearOn())
+                                    ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                             float targetY = -chin;
                             if (view.getTranslationY() != targetY) {
                                 view.setTranslationY(targetY);
