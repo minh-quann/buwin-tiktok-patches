@@ -22,7 +22,6 @@ import android.widget.FrameLayout;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
 import app.morphe.extension.tiktok.cleardisplay.RememberClearDisplayPatch;
 import app.morphe.extension.tiktok.settings.Settings;
 import app.morphe.extension.tiktok.settings.SettingsStatus;
@@ -269,15 +268,33 @@ public final class SeeThroughStatusBar {
         View surface = findSurface(group);
 
         Activity activity = activityOf(player);
-        boolean commentsOpen = activity != null && FeedVisibility.isCommentSheetVisible(activity);
-        boolean scalingForComments = (player.getScaleX() < 0.98f && !FILLED.containsKey(player))
-                || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface));
-
-        if (commentsOpen || scalingForComments) {
-            // While comments are open or actively animating, do not reset or fight TikTok's animation.
-            // If surface was already scaled/shifted to fill status bar, KEEP IT AS-IS so that when comments
-            // close, video seamlessly returns to edge-to-edge without any status bar black flash or pop-in jump!
-            return;
+        boolean disableShrink = Settings.DISABLE_COMMENT_SHRINK.get();
+        if (disableShrink) {
+            // Keep the video full screen behind comments: counteract TikTok's shrink animation
+            if (player.getScaleX() != 1.0f) {
+                player.setScaleX(1.0f);
+                player.setScaleY(1.0f);
+            }
+            if (player.getTranslationX() != 0f) {
+                player.setTranslationX(0f);
+            }
+            if (player.getTranslationY() != 0f) {
+                player.setTranslationY(0f);
+            }
+            if (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface)) {
+                surface.setScaleX(1.0f);
+                surface.setScaleY(1.0f);
+            }
+        } else {
+            // Yield only while TikTok is actively shrinking the video (< 0.98f).
+            // Do NOT check FeedVisibility.isCommentSheetVisible() here: when comments sheet is dismissed,
+            // TikTok's player reaches 1.0f before the sheet view fully detaches. Blocking fill() with
+            // isCommentSheetVisible causes a 1-frame black status bar gap and jump when the sheet finally detaches.
+            boolean scalingForComments = (player.getScaleX() < 0.98f && !FILLED.containsKey(player))
+                    || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface));
+            if (scalingForComments) {
+                return;
+            }
         }
 
         String style = Settings.STATUS_BAR_STYLE.get();

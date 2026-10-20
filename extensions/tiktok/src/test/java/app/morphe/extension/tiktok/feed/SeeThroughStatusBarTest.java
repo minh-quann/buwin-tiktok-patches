@@ -531,6 +531,23 @@ public class SeeThroughStatusBarTest {
             assertEquals("TikTok scaleX was overridden", 0.7f, player.getScaleX(), 0f);
             assertEquals("TikTok scaleY was overridden", 0.7f, player.getScaleY(), 0f);
             assertEquals("TikTok translation was overridden", -300f, player.getTranslationY(), 0f);
+
+            // When comments are dismissed, TikTok restores player to 1.0f and translation to 0f
+            player.setScaleX(1.0f);
+            player.setScaleY(1.0f);
+            player.setTranslationY(0f);
+            SeeThroughStatusBar.fill(player, true);
+            assertEquals("Status bar shift re-applied on comments dismiss", -106f, surface.getTranslationY(), 0f);
+
+            // With DISABLE_COMMENT_SHRINK enabled, shrinking is counteracted
+            Settings.DISABLE_COMMENT_SHRINK.save(true);
+            player.setScaleX(0.7f);
+            player.setScaleY(0.7f);
+            player.setTranslationY(-300f);
+            SeeThroughStatusBar.fill(player, true);
+            assertEquals("player scaleX restored", 1.0f, player.getScaleX(), 0f);
+            assertEquals("player scaleY restored", 1.0f, player.getScaleY(), 0f);
+            assertEquals("player translationY restored", 0f, player.getTranslationY(), 0f);
         }
     }
 }
