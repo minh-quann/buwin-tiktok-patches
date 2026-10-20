@@ -223,6 +223,22 @@ public final class SeeThroughStatusBar {
         return top;
     }
 
+    /** Calculates unshifted left coordinate of target relative to ancestor. */
+    private static int leftInParent(View target, View ancestor) {
+        int left = 0;
+        View current = target;
+        while (current != null && current != ancestor) {
+            left += current.getLeft();
+            ViewParent p = current.getParent();
+            if (p instanceof View) {
+                current = (View) p;
+            } else {
+                break;
+            }
+        }
+        return left;
+    }
+
     /** Ensures none of the ancestors clip children so the scaled video can extend to screen edges. */
     static void unclipAncestors(View view, View limit) {
         ViewParent p = view.getParent();
@@ -303,40 +319,50 @@ public final class SeeThroughStatusBar {
         }
 
         if (doScale) {
-            // Scale mode: center vertically and scale to fill from y=0 to targetHeight (meeting the solid black bottom bar)
+            // Scale mode: center and aspect fill from y=0 to targetHeight (meeting the solid black bottom bar)
             View targetView = surface != null ? surface : player;
             int vWidth = targetView.getWidth();
             int vHeight = targetView.getHeight();
 
-            if (vWidth > 0 && vHeight > vWidth) {
+            int cellWidth = cell != null && cell.getWidth() > 0 ? cell.getWidth()
+                    : player.getResources().getDisplayMetrics().widthPixels;
+            if (cellWidth <= 0) cellWidth = player.getResources().getDisplayMetrics().widthPixels;
+
+            if (vWidth > 0 && vHeight > 0) {
                 unclipAncestors(targetView, cell);
 
-                // Add 2px to guarantee zero sub-pixel hairline gaps between video and top/bottom bar
-                float neededScale = (float) (targetHeight + 2) / (float) vHeight;
+                // True Aspect Fill: guarantee video covers 100% width and 100% height with +2px anti-hairline margin
+                float scaleX = (float) (cellWidth + 2) / (float) vWidth;
+                float scaleY = (float) (targetHeight + 2) / (float) vHeight;
+                float neededScale = Math.max(scaleX, scaleY);
                 if (neededScale < 1f) neededScale = 1f;
                 if (neededScale > MAX_FILL_SCALE) neededScale = MAX_FILL_SCALE;
+
+                float targetCenterX = cellWidth / 2f;
+                float currentCenterX = leftInParent(targetView, cell) + vWidth / 2f;
+                float shiftX = targetCenterX - currentCenterX;
 
                 float targetCenterY = targetHeight / 2f;
                 float currentCenterY = topInParent(targetView, cell) + vHeight / 2f;
                 float shiftY = targetCenterY - currentCenterY;
 
-                android.util.Log.i("buwin", "ScaleToFill: scale=" + neededScale + ", shiftY=" + shiftY
-                        + ", targetH=" + targetHeight + ", vH=" + vHeight + ", chin=" + chin);
+                android.util.Log.i("buwin", "ScaleToFill: scale=" + neededScale + ", shiftX=" + shiftX
+                        + ", shiftY=" + shiftY + ", targetH=" + targetHeight + ", vH=" + vHeight);
 
                 if (surface != null) {
-                    shift(player, 0f);
+                    shift(player, 0f, 0f);
                     grow(player, 1f);
-                    shift(surface, shiftY);
+                    shift(surface, shiftX, shiftY);
                     grow(surface, neededScale);
                 } else {
-                    shift(player, shiftY);
+                    shift(player, shiftX, shiftY);
                     grow(player, neededScale);
                 }
             } else {
-                shift(player, 0f);
+                shift(player, 0f, 0f);
                 grow(player, 1f);
                 if (surface != null) {
-                    shift(surface, 0f);
+                    shift(surface, 0f, 0f);
                     grow(surface, 1f);
                 }
             }
@@ -394,13 +420,13 @@ public final class SeeThroughStatusBar {
 
     /** Writes {@code scale} on {@code view} and tracks it. */
     private static void grow(View view, float scale) {
+        if (view.getWidth() > 0 && view.getHeight() > 0) {
+            view.setPivotX(view.getWidth() / 2f);
+            view.setPivotY(view.getHeight() / 2f);
+        }
         if (scale == 1f) {
             Float was = FILLED.remove(view);
             if (was != null) {
-                if (view.getWidth() > 0 && view.getHeight() > 0) {
-                    view.setPivotX(view.getWidth() / 2f);
-                    view.setPivotY(view.getHeight() / 2f);
-                }
                 view.setScaleX(1f);
                 view.setScaleY(1f);
             }
@@ -408,34 +434,31 @@ public final class SeeThroughStatusBar {
         }
         Float was = FILLED.get(view);
         float current = view.getScaleY();
-        if ((was == null ? 1f : was) == current && view.getScaleX() == current) {
-            if (scale == current) return;
-        }
-        if (view.getWidth() > 0 && view.getHeight() > 0) {
-            view.setPivotX(view.getWidth() / 2f);
-            view.setPivotY(view.getHeight() / 2f);
+        if ((was == null ? 1f : was) == current && view.getScaleX() == current && scale == current) {
+            return;
         }
         view.setScaleX(scale);
         view.setScaleY(scale);
         FILLED.put(view, scale);
     }
 
-    /** Writes {@code translationY} on {@code view} and tracks it. */
-    private static void shift(View view, float translationY) {
-        if (translationY == 0f) {
-            Float was = SHIFTED.remove(view);
-            if (was != null) {
+    /** Writes translation on {@code view} and tracks it. */
+    private static void shift(View view, float translationX, float translationY) {
+        if (translationX == 0f && translationY == 0f) {
+            Float wasY = SHIFTED.remove(view);
+            if (wasY != null) {
                 view.setTranslationY(0f);
             }
+            view.setTranslationX(0f);
             return;
         }
-        Float was = SHIFTED.get(view);
-        float current = view.getTranslationY();
-        if ((was == null ? 0f : was) == current) {
-            if (translationY == current) return;
-        }
+        view.setTranslationX(translationX);
         view.setTranslationY(translationY);
         SHIFTED.put(view, translationY);
+    }
+
+    private static void shift(View view, float translationY) {
+        shift(view, 0f, translationY);
     }
 
     /** {@link #fillScale(int, View, boolean)} for a surface TikTok centered by its layout. */

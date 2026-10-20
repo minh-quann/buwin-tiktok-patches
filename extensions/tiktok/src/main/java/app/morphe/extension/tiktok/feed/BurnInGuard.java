@@ -132,31 +132,11 @@ public final class BurnInGuard {
     private static void place(Activity activity, boolean shifting, long now) {
         View content = activity.findViewById(android.R.id.content);
         if (content == null) return;
-        float[] held = MOVED.get(content);
-        if (!shifting) {
-            if (held != null) {
-                MOVED.remove(content);
-                if (content.getTranslationX() == held[2]) content.setTranslationX(held[0]);
-                if (content.getTranslationY() == held[3]) content.setTranslationY(held[1]);
-            }
-            return;
-        }
-        float x = content.getTranslationX();
-        float y = content.getTranslationY();
-        if (held == null) {
-            held = new float[]{x, y, x, y};
-            MOVED.put(content, held);
-        } else {
-            // Something else wrote its own since the last pass; that's where the content is now.
-            if (x != held[2]) held[0] = x;
-            if (y != held[3]) held[1] = y;
-        }
-        int[] at = placeAt(now);
-        float step = STEP_DP * content.getResources().getDisplayMetrics().density;
-        held[2] = held[0] + at[0] * step;
-        held[3] = held[1] + at[1] * step;
-        if (x != held[2]) content.setTranslationX(held[2]);
-        if (y != held[3]) content.setTranslationY(held[3]);
+        // Never translate android.R.id.content: shifting the window content creates black void borders
+        // at the top and left screen edges on edge-to-edge video playback.
+        if (content.getTranslationX() != 0f) content.setTranslationX(0f);
+        if (content.getTranslationY() != 0f) content.setTranslationY(0f);
+        MOVED.remove(content);
     }
 
     private static void schedule(long next) {

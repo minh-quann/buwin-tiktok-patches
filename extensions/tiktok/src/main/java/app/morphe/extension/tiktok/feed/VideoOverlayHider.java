@@ -2028,7 +2028,11 @@ public final class VideoOverlayHider {
                         }
                         // The Following stories pill is the strip's neighbour at the top of the
                         // feed, so it fades with the tabs; it was only ever hidden (#84).
-                        setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                        if (target == BOTTOM_TABS_TARGET) {
+                            fadeTabIcons(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                        } else {
+                            setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                        }
                         setHidden(view, wanted);
                     } else if (target == BOTTOM_SPACER_TARGET) {
                         setHidden(view, wanted);
@@ -2365,6 +2369,28 @@ public final class VideoOverlayHider {
         Float before = FADED_HERE.remove(view);
         if (before != null && view.getAlpha() == 0f) {
             view.setAlpha(before);
+        }
+    }
+
+    /**
+     * Dims individual tab item views inside the bottom navigation bar without dimming the bar's container,
+     * ensuring the solid black background remains 100% opaque and never disappears when burn-in activates.
+     */
+    private static void fadeTabIcons(View bar, int percent) {
+        if (bar == null) return;
+        FADED_TO.remove(bar);
+        if (bar.getAlpha() != 1.0f) {
+            bar.setAlpha(1.0f);
+        }
+        if (!(bar instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup vg = (ViewGroup) bar;
+        for (int i = 0, count = vg.getChildCount(); i < count; i++) {
+            View child = vg.getChildAt(i);
+            if (child != null) {
+                setFaded(child, percent);
+            }
         }
     }
 
