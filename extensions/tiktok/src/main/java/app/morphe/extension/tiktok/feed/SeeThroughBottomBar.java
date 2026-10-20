@@ -183,7 +183,7 @@ final class SeeThroughBottomBar {
     /** Returns the Y coordinate where the bottom bar begins on screen, or fallback. */
     static int getBottomBarTop(View contextView, int fullHeight) {
         View bar = bottomBarRef.get();
-        if (bar != null && bar.getHeight() > 0) {
+        if (bar != null && bar.getHeight() > 0 && bar.isShown()) {
             int top = bar.getTop();
             if (top > 0 && top < fullHeight) {
                 return top;

@@ -1930,7 +1930,9 @@ public final class VideoOverlayHider {
                             setTransparent(view, false);
                             setFaded(view, fadeLevel, fadedClear);
                         }
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
+                        boolean clearMode = clearOn();
+                        int chin = (clearMode || SeeThroughBottomBar.isSystemIndicatorActive(view))
+                                ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                         float targetY = -chin;
                         if (view.getTranslationY() != targetY) {
                             view.setTranslationY(targetY);
@@ -1958,10 +1960,15 @@ public final class VideoOverlayHider {
                         android.view.ViewParent frame = view.getParent();
                         View targetView = frame instanceof View ? (View) frame : view;
                         setTransparent(targetView, wanted);
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(targetView) ? 0 : SeeThroughBottomBar.getChinHeight(targetView.getContext());
+                        boolean clearMode = clearOn();
+                        int chin = (clearMode || SeeThroughBottomBar.isSystemIndicatorActive(view))
+                                ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                         float targetY = -chin;
-                        if (targetView.getTranslationY() != targetY) {
-                            targetView.setTranslationY(targetY);
+                        if (view.getTranslationY() != targetY) {
+                            view.setTranslationY(targetY);
+                        }
+                        if (targetView != view && targetView.getTranslationY() != 0f) {
+                            targetView.setTranslationY(0f);
                         }
                     } else if (target == ANCHOR_TARGET || target == MUSIC_COVER_TARGET
                             || target == SEARCH_BAR_TARGET) {
@@ -2038,10 +2045,8 @@ public final class VideoOverlayHider {
                         setHidden(view, wanted);
                     } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET
                             || target == CLEAR_PHOTO_EXIT_TARGET) {
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                        float targetY = -chin;
-                        if (view.getTranslationY() != targetY) {
-                            view.setTranslationY(targetY);
+                        if (view.getTranslationY() != 0f) {
+                            view.setTranslationY(0f);
                         }
                         setHidden(view, wanted);
                     } else if (target == DETAIL_COMMENT_STRIP_TARGET) {
