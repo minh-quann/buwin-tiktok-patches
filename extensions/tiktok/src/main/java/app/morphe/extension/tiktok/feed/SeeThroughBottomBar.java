@@ -90,7 +90,6 @@ final class SeeThroughBottomBar {
     /** Original heights and bottom paddings of views adjusted for chin. */
     private static final Map<View, Integer> ORIGINAL_BAR_HEIGHT = new WeakHashMap<>();
     private static final Map<View, Integer> ORIGINAL_BAR_PADDING_BOTTOM = new WeakHashMap<>();
-    private static final Map<View, Integer> ORIGINAL_SPACER_HEIGHT = new WeakHashMap<>();
 
     /**
      * Overlays (the caption frame, the buttons' column) measured with the spacer in place: true
@@ -255,31 +254,7 @@ final class SeeThroughBottomBar {
         }
     }
 
-    /**
-     * Adjusts the cell bottom spacer's height by the chin height so the video content
-     * and video_seek_bar stop cleanly above the elevated bottom bar, preventing any overlap.
-     */
-    static void adjustBottomSpacerChin(View spacer) {
-        if (spacer == null) return;
-        boolean indicatorActive = isSystemIndicatorActive(spacer);
-        int chin = indicatorActive ? 0 : getChinHeight(spacer.getContext());
 
-        ViewGroup.LayoutParams lp = spacer.getLayoutParams();
-        if (lp != null) {
-            Integer origH = ORIGINAL_SPACER_HEIGHT.get(spacer);
-            if (origH == null) {
-                origH = lp.height >= 0 ? lp.height : Math.max(0, spacer.getHeight());
-                ORIGINAL_SPACER_HEIGHT.put(spacer, origH);
-            }
-            if (origH != null) {
-                int targetH = origH + chin;
-                if (lp.height != targetH) {
-                    lp.height = targetH;
-                    spacer.setLayoutParams(lp);
-                }
-            }
-        }
-    }
 
     /** Whether the spacer under the video may be collapsed. */
     static boolean collapseAllowed() {

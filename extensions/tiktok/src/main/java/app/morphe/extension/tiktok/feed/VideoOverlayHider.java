@@ -2031,7 +2031,6 @@ public final class VideoOverlayHider {
                         setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
                         setHidden(view, wanted);
                     } else if (target == BOTTOM_SPACER_TARGET) {
-                        SeeThroughBottomBar.adjustBottomSpacerChin(view);
                         setHidden(view, wanted);
                     } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET
                             || target == CLEAR_PHOTO_EXIT_TARGET) {

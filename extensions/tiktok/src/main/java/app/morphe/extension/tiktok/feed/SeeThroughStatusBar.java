@@ -161,6 +161,86 @@ public final class SeeThroughStatusBar {
         return null;
     }
 
+    /** Finds any child SurfaceView or TextureView within root. */
+    static View findSurface(View root) {
+        if (root instanceof SurfaceView || root instanceof TextureView) {
+            return root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) root;
+            for (int i = 0, count = vg.getChildCount(); i < count; i++) {
+                View found = findSurface(vg.getChildAt(i));
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    /** Finds the root view of the feed cell (view_rootview) or topmost laid-out ancestor. */
+    static View findCellRoot(View view) {
+        View current = view;
+        View best = null;
+        while (current != null) {
+            if ("view_rootview".equals(getViewIdName(current))) {
+                return current;
+            }
+            if (current.getHeight() > 0) {
+                best = current;
+            }
+            ViewParent p = current.getParent();
+            if (p instanceof View) {
+                current = (View) p;
+            } else {
+                break;
+            }
+        }
+        return best;
+    }
+
+    private static String getViewIdName(View v) {
+        try {
+            if (v.getId() > 0 && v.getResources() != null) {
+                return v.getResources().getResourceEntryName(v.getId());
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** Calculates unshifted top coordinate of target relative to ancestor. */
+    private static int topInParent(View target, View ancestor) {
+        int top = 0;
+        View current = target;
+        while (current != null && current != ancestor) {
+            top += current.getTop();
+            ViewParent p = current.getParent();
+            if (p instanceof View) {
+                current = (View) p;
+            } else {
+                break;
+            }
+        }
+        return top;
+    }
+
+    /** Ensures none of the ancestors clip children so the scaled video can extend to screen edges. */
+    static void unclipAncestors(View view, View limit) {
+        ViewParent p = view.getParent();
+        while (p instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) p;
+            if (vg.getClipChildren()) {
+                vg.setClipChildren(false);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                if (vg.getClipToPadding()) {
+                    vg.setClipToPadding(false);
+                }
+            }
+            if (vg == limit) break;
+            p = vg.getParent();
+        }
+    }
+
     /**
      * One layout pass over a feed cell's player: manages video size and position
      * based on the selected {@link Settings#STATUS_BAR_STYLE}.
@@ -176,14 +256,7 @@ public final class SeeThroughStatusBar {
         }
 
         ViewGroup group = (ViewGroup) player;
-        View surface = null;
-        for (int i = 0, count = group.getChildCount(); i < count; i++) {
-            View child = group.getChildAt(i);
-            if (child instanceof SurfaceView || child instanceof TextureView) {
-                surface = child;
-                break;
-            }
-        }
+        View surface = findSurface(group);
 
         // If TikTok is actively scaling down the player/surface for comments or transition, yield immediately
         if (wanted) {
@@ -199,31 +272,65 @@ public final class SeeThroughStatusBar {
         boolean doShiftSplit = wanted && Settings.STATUS_BAR_STYLE_SHIFT_SPLIT.equals(style);
         boolean doGradient = wanted && Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
 
-        ViewParent space = player.getParent();
-        boolean spaceValid = space instanceof View;
-        int spaceHeight = spaceValid ? ((View) space).getHeight() : group.getHeight();
+        View cell = findCellRoot(player);
+        int fullHeight = cell != null ? cell.getHeight() : 0;
+        if (fullHeight <= 0) {
+            ViewParent space = player.getParent();
+            if (space instanceof View) {
+                fullHeight = ((View) space).getHeight();
+            }
+        }
+        if (fullHeight <= 0) {
+            Activity activity = activityOf(player);
+            if (activity != null && activity.getWindow() != null && activity.getWindow().getDecorView() != null) {
+                fullHeight = activity.getWindow().getDecorView().getHeight();
+            }
+        }
+        if (fullHeight <= 0) {
+            fullHeight = player.getResources().getDisplayMetrics().heightPixels;
+        }
+
+        boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(player);
+        int chin = indicatorActive ? 0 : SeeThroughBottomBar.getChinHeight(player.getContext());
+        int targetHeight = fullHeight - chin;
+        if (targetHeight <= 0) targetHeight = fullHeight;
 
         if (doScale) {
-            // Scale mode: center vertically and scale with minimal crop (balanced iOS style)
-            shift(player, 0f);
-            if (surface != null) {
-                int pHeight = group.getHeight();
-                int sHeight = surface.getHeight();
-                int sWidth = surface.getWidth();
-                if (pHeight > sHeight && sHeight > sWidth && sWidth > 0) {
-                    float top = surface.getTop();
-                    float bottom = pHeight - surface.getBottom();
-                    float centerShift = (top - bottom) / 2f;
-                    shift(surface, -centerShift);
-                    float optimalScale = ((pHeight - sHeight) + sHeight + 2f) / sHeight;
-                    if (optimalScale > MAX_FILL_SCALE) optimalScale = MAX_FILL_SCALE;
-                    grow(surface, optimalScale);
+            // Scale mode: center vertically and scale to fill from top to targetHeight (above black chin)
+            View targetView = surface != null ? surface : player;
+            int vWidth = targetView.getWidth();
+            int vHeight = targetView.getHeight();
+
+            if (vWidth > 0 && vHeight > vWidth) {
+                unclipAncestors(targetView, cell);
+
+                float neededScale = (float) targetHeight / (float) vHeight;
+                if (neededScale < 1f) neededScale = 1f;
+                if (neededScale > MAX_FILL_SCALE) neededScale = MAX_FILL_SCALE;
+
+                float targetCenterY = targetHeight / 2f;
+                float currentCenterY = topInParent(targetView, cell) + vHeight / 2f;
+                float shiftY = targetCenterY - currentCenterY;
+
+                android.util.Log.i("buwin", "ScaleToFill: scale=" + neededScale + ", shiftY=" + shiftY
+                        + ", targetH=" + targetHeight + ", vH=" + vHeight + ", chin=" + chin);
+
+                if (surface != null) {
+                    shift(player, 0f);
+                    grow(player, 1f);
+                    shift(surface, shiftY);
+                    grow(surface, neededScale);
                 } else {
-                    shift(surface, 0f);
-                    grow(surface, fillScale(group.getHeight(), surface));
+                    shift(player, shiftY);
+                    grow(player, neededScale);
                 }
-            } else if (spaceValid) {
-                grow(player, fillScale(spaceHeight, player, true));
+            } else {
+                shift(player, 0f);
+                grow(player, 1f);
+                if (surface != null) {
+                    shift(surface, 0f);
+                    grow(surface, 1f);
+                }
             }
         } else if (doShift || doGradient) {
             // Shift mode or Ambient Gradient: keep 1:1 scale (zero horizontal crop), shift upwards so top reaches status bar
@@ -235,12 +342,12 @@ public final class SeeThroughStatusBar {
                     shift(player, 0f);
                 } else {
                     shift(surface, 0f);
-                    float pShift = computeShift(player, spaceHeight);
+                    float pShift = computeShift(player, fullHeight);
                     shift(player, -pShift);
                 }
             } else {
                 grow(player, 1f);
-                float pShift = computeShift(player, spaceHeight);
+                float pShift = computeShift(player, fullHeight);
                 shift(player, -pShift);
             }
         } else if (doShiftSplit) {
@@ -253,12 +360,12 @@ public final class SeeThroughStatusBar {
                     shift(player, 0f);
                 } else {
                     shift(surface, 0f);
-                    float pShift = computeShift(player, spaceHeight) / 2f;
+                    float pShift = computeShift(player, fullHeight) / 2f;
                     shift(player, -pShift);
                 }
             } else {
                 grow(player, 1f);
-                float pShift = computeShift(player, spaceHeight) / 2f;
+                float pShift = computeShift(player, fullHeight) / 2f;
                 shift(player, -pShift);
             }
         } else {
