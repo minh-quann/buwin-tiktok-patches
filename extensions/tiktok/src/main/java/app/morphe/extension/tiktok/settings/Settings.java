@@ -880,6 +880,12 @@ public class Settings extends BaseSettings {
             Setting.parent(SEE_THROUGH_STATUS_BAR)
     );
     /**
+     * Prevents TikTok from shrinking the video when the comment sheet opens, keeping the video
+     * full screen behind the comments for a seamless, jitter-free experience.
+     */
+    public static final BooleanSetting DISABLE_COMMENT_SHRINK = new BooleanSetting(
+            "disable_comment_shrink", FALSE);
+    /**
      * Burn-in guard for OLED screens (BurnInGuard): "dim" draws the controls the fade covers at a
      * quarter after a few seconds without a touch, "dim_shift" also moves the window's content a
      * couple of dp every two minutes. Over the feed and an opened video only.
