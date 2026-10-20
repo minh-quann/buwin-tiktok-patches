@@ -62,8 +62,6 @@ public final class SeeThroughStatusBar {
             Window window = activity.getWindow();
             if (window == null) return;
             boolean statusBar = Settings.HIDE_STATUS_BAR.get();
-            boolean seeThrough = Settings.SEE_THROUGH_STATUS_BAR.get();
-            if (!statusBar && !seeThrough) return;
 
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
@@ -100,27 +98,21 @@ public final class SeeThroughStatusBar {
         }
     }
 
-    /** One layout pass: clears the bar while {@code wanted}, and gives its color back otherwise. */
+    /** One layout pass: keeps transparent status bar and updates ambient gradient scrim. */
     static void apply(Activity activity, boolean wanted) {
         Window window = activity.getWindow();
         if (window == null) return;
         int color = window.getStatusBarColor();
         String style = Settings.STATUS_BAR_STYLE.get();
-        boolean isGradient = wanted && Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
+        boolean isGradient = Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
 
-        if (wanted) {
-            if (color != Color.TRANSPARENT) {
-                // Keep previous non-transparent color
-                if (!CLEARED.containsKey(window)) {
-                    CLEARED.put(window, color);
-                }
-                window.setStatusBarColor(Color.TRANSPARENT);
+        if (color != Color.TRANSPARENT) {
+            if (!CLEARED.containsKey(window)) {
+                CLEARED.put(window, color);
             }
+            window.setStatusBarColor(Color.TRANSPARENT);
         } else {
-            Integer own = CLEARED.remove(window);
-            if (own != null && color == Color.TRANSPARENT) {
-                window.setStatusBarColor(own);
-            }
+            CLEARED.put(window, Color.TRANSPARENT);
         }
 
         updateGradientScrim(activity, isGradient);
@@ -332,10 +324,10 @@ public final class SeeThroughStatusBar {
         }
 
         String style = Settings.STATUS_BAR_STYLE.get();
-        boolean doScale = wanted && Settings.STATUS_BAR_STYLE_SCALE.equals(style);
         boolean doShift = wanted && Settings.STATUS_BAR_STYLE_SHIFT.equals(style);
         boolean doShiftSplit = wanted && Settings.STATUS_BAR_STYLE_SHIFT_SPLIT.equals(style);
         boolean doGradient = wanted && Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
+        boolean doScale = wanted && !doShift && !doShiftSplit && !doGradient;
 
         View cell = findCellRoot(player);
         int fullHeight = cell != null ? cell.getHeight() : 0;

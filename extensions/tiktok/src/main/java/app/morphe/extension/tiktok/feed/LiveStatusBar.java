@@ -118,8 +118,6 @@ public final class LiveStatusBar {
         application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityResumed(Activity resumed) {
                 boolean hideBar = Settings.HIDE_STATUS_BAR_IN_LIVE.get();
-                boolean liveUnderBar = Settings.LIVE_UNDER_STATUS_BAR.get() || Settings.SEE_THROUGH_STATUS_BAR.get();
-                if (!hideBar && !liveUnderBar) return;
                 if (isLiveRoom(resumed)) hide(resumed, hideBar);
                 else if (isDetail(resumed)) watch(resumed, hideBar);
             }
@@ -129,7 +127,9 @@ public final class LiveStatusBar {
                 if (HIDDEN.containsKey(paused)) show(paused);
             }
 
-            @Override public void onActivityCreated(Activity created, Bundle state) { }
+            @Override public void onActivityCreated(Activity created, Bundle state) {
+                SeeThroughStatusBar.enableEdgeToEdge(created);
+            }
             @Override public void onActivityStarted(Activity started) { }
             @Override public void onActivityStopped(Activity stopped) { }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { }

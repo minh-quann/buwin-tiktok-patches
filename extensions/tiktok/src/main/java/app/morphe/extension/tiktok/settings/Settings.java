@@ -867,7 +867,7 @@ public class Settings extends BaseSettings {
      * SeeThroughStatusBar clears the bar's color while the feed is in front; both go back when
      * this goes off or Buwin is paused. Read on each layout.
      */
-    public static final BooleanSetting SEE_THROUGH_STATUS_BAR = new BooleanSetting("see_through_status_bar", FALSE);
+    public static final BooleanSetting SEE_THROUGH_STATUS_BAR = new BooleanSetting("see_through_status_bar", TRUE);
     public static final String STATUS_BAR_STYLE_SCALE = "scale";
     public static final String STATUS_BAR_STYLE_SHIFT = "shift";
     public static final String STATUS_BAR_STYLE_SHIFT_SPLIT = "shift_split";

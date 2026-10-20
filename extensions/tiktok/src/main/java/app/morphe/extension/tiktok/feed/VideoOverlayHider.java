@@ -625,9 +625,7 @@ public final class VideoOverlayHider {
             // which it shows only in Clear display; see gateClearControls.
             boolean clearControls = !BuwinPause.isPaused() && Settings.HIDE_CLEAR_DISPLAY_CONTROLS.get();
             boolean statusBar = Settings.HIDE_STATUS_BAR.get();
-            // The main feed's video goes up under a see-through status bar: the spacer TikTok keeps
-            // for the bar above each video goes, as it does with the bar hidden, which wins (#145).
-            boolean seeThroughStatusBar = Settings.SEE_THROUGH_STATUS_BAR.get() && !detailPager && !statusBar;
+            boolean seeThroughStatusBar = !detailPager && !statusBar;
             boolean commentsOpen = FeedVisibility.isCommentSheetVisible(activity);
             // The bottom bar goes clear and the spacer under each video goes, on the main feed
             // only: the opened-post pager has no tab bar (#145).
@@ -702,10 +700,10 @@ public final class VideoOverlayHider {
                 wanted[TOP_SEARCH_BAR_TARGET] = false;
                 wanted[TOP_SEARCH_SCRIM_TARGET] = false;
                 wanted[DETAIL_SEARCH_BOX_TARGET] = detailSearchBox;
-                wanted[STATUS_BAR_SPACER_TARGET] = statusBar || seeThroughStatusBar;
-                wanted[STATUS_BAR_SCRIM_TARGET] = statusBar || seeThroughStatusBar;
+                wanted[STATUS_BAR_SPACER_TARGET] = true;
+                wanted[STATUS_BAR_SCRIM_TARGET] = true;
                 // Grown, not hidden: see SeeThroughStatusBar.fill. Yields when comments sheet is open to prevent flicker.
-                wanted[PLAYER_VIEW_TARGET] = seeThroughStatusBar;
+                wanted[PLAYER_VIEW_TARGET] = !detailPager;
                 wanted[BOTTOM_SPACER_TARGET] = seeThroughBar && SeeThroughBottomBar.collapseAllowed();
                 for (int i = 0; i < RAIL_BUTTON_IDS.length; i++) {
                     wanted[RAIL_TARGET_START + i] = rail[i] || carryHides;
@@ -812,7 +810,7 @@ public final class VideoOverlayHider {
             setStatusBarHidden(activity, statusBar);
             // Only while the feed is in front: the window's other pages keep the color TikTok gives them.
             boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity);
-            SeeThroughStatusBar.apply(activity, seeThroughStatusBar && onFeed);
+            SeeThroughStatusBar.apply(activity, onFeed);
         } catch (Throwable ex) {
             Logger.printException(() -> "Video overlay hider failed", ex);
         }
