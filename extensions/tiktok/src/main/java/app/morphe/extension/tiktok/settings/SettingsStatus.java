@@ -22,6 +22,8 @@ public class SettingsStatus {
     public static void enableSubtitleTools() { subtitleToolsEnabled = true; }
     public static boolean screenCaptureEnabled;
     public static void enableScreenCapture() { screenCaptureEnabled = true; }
+    public static boolean commentShrinkControlEnabled;
+    public static void enableCommentShrinkControl() { commentShrinkControlEnabled = true; }
     // Volatile because FeatureGateLearnMode reads it before taking its monitor, on TikTok's own
     // gate threads, to decide whether the monitor is needed at all.
     public static volatile boolean featureGateRecorderEnabled;

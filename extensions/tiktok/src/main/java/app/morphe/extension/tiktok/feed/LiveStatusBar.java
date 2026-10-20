@@ -118,7 +118,8 @@ public final class LiveStatusBar {
         application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityResumed(Activity resumed) {
                 boolean hideBar = Settings.HIDE_STATUS_BAR_IN_LIVE.get();
-                if (!hideBar && !Settings.LIVE_UNDER_STATUS_BAR.get()) return;
+                boolean liveUnderBar = Settings.LIVE_UNDER_STATUS_BAR.get() || Settings.SEE_THROUGH_STATUS_BAR.get();
+                if (!hideBar && !liveUnderBar) return;
                 if (isLiveRoom(resumed)) hide(resumed, hideBar);
                 else if (isDetail(resumed)) watch(resumed, hideBar);
             }
@@ -192,13 +193,13 @@ public final class LiveStatusBar {
             Room room = new Room(activity, decor, cutout, hideBar, window.getStatusBarColor(), stream);
             HIDDEN.put(activity, room);
             if (!hideBar) {
-                // See through, so the stream shows under the clock. Android 15 draws every app's
-                // bar see through already and ignores this; the black there is TikTok's cover.
+                // See through, so the stream shows under the clock.
+                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
                 window.setStatusBarColor(Color.TRANSPARENT);
             }
-            // Only a room that stays out of the cutout is let in. 47.1.3's LIVE window already
-            // asks for ALWAYS (read off the S22), which SHORT_EDGES would narrow in landscape.
-            if (hideBar && Build.VERSION.SDK_INT >= 28
+            // Allow the window into the display cutout so the stream reaches the screen edge
+            if (Build.VERSION.SDK_INT >= 28
                     && (cutout == WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
                     || cutout == WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER)) {
                 attributes.layoutInDisplayCutoutMode =
@@ -215,6 +216,10 @@ public final class LiveStatusBar {
                 } else {
                     decor.setSystemUiVisibility(decor.getSystemUiVisibility() | LEGACY_FLAGS);
                 }
+            } else {
+                decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
             }
             // The room's views are laid out after it resumes, and its insets are only known once
             // the window is attached, so the strip is looked for on the layout passes that follow.
@@ -285,7 +290,9 @@ public final class LiveStatusBar {
 
     private static boolean isBar(int offset, int[] bars) {
         if (offset <= 0) return false;
-        for (int bar : bars) if (bar == offset) return true;
+        for (int bar : bars) {
+            if (bar > 0 && Math.abs(bar - offset) <= 8) return true;
+        }
         return false;
     }
 
@@ -1095,8 +1102,17 @@ public final class LiveStatusBar {
             if (videoId < 0) {
                 Activity room = activity.get();
                 if (room == null) return 0;
-                videoId = videoContainerForTests != 0 ? videoContainerForTests
-                        : room.getResources().getIdentifier(VIDEO_CONTAINER, "id", room.getPackageName());
+                if (videoContainerForTests != 0) {
+                    videoId = videoContainerForTests;
+                } else {
+                    videoId = room.getResources().getIdentifier(VIDEO_CONTAINER, "id", room.getPackageName());
+                    if (videoId == 0) {
+                        videoId = room.getResources().getIdentifier("user_live_video_container_layout", "id", room.getPackageName());
+                    }
+                    if (videoId == 0) {
+                        videoId = room.getResources().getIdentifier("ttlive_effect_engine_layout_video", "id", room.getPackageName());
+                    }
+                }
                 if (videoId == 0) HookStatus.missingViewId(HOOK_FAMILY, VIDEO_CONTAINER);
             }
             return videoId;

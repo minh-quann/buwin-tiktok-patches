@@ -677,6 +677,12 @@ public class Settings extends BaseSettings {
     public static final BooleanSetting PAUSE_ON_COMMENTS = new BooleanSetting(
             "pause_on_comments", FALSE, true);
     /**
+     * Keep the video full screen when comments sheet opens instead of shrinking it.
+     * Prevents status bar black scrim and screen flickering.
+     */
+    public static final BooleanSetting DISABLE_COMMENT_SHRINK = new BooleanSetting(
+            "disable_comment_shrink", TRUE);
+    /**
      * Holds the feed on returning to the app until the reader taps. Off by default. TikTok
      * starts playing again by itself on every return, which is the one moment nobody has asked
      * for anything.
@@ -906,7 +912,7 @@ public class Settings extends BaseSettings {
     /** LIVE rooms are an activity of their own, which Hide the status bar never reached (#38). */
     public static final BooleanSetting HIDE_STATUS_BAR_IN_LIVE = new BooleanSetting("hide_status_bar_in_live", FALSE);
     /** Only the black strip TikTok keeps for the bar goes; the bar stays over the stream (#137). */
-    public static final BooleanSetting LIVE_UNDER_STATUS_BAR = new BooleanSetting("live_under_status_bar", FALSE);
+    public static final BooleanSetting LIVE_UNDER_STATUS_BAR = new BooleanSetting("live_under_status_bar", TRUE);
     public static final StringSetting TOUCH_TARGET_SCALE = new StringSetting("touch_target_scale", "1");
     public static final BooleanSetting HIDE_SENSITIVE_WARNINGS = new BooleanSetting("hide_sensitive_warnings", FALSE);
     /** The Check sources banner on a video TikTok flags as unverified, and the share warnings that read it. */

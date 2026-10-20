@@ -39,7 +39,7 @@ public final class PlaybackPreferenceCategory extends ConditionalPreferenceCateg
                 || SettingsStatus.stopVideoLoopingEnabled || SettingsStatus.resumeVideoAfterScrollEnabled
                 // The comment sheet switch is a playback switch, and on a bundle with the
                 // comment tools and none of the players it is the only thing on this page.
-                || SettingsStatus.commentToolsEnabled;
+                || SettingsStatus.commentToolsEnabled || SettingsStatus.commentShrinkControlEnabled;
     }
 
     @Override
@@ -76,11 +76,15 @@ public final class PlaybackPreferenceCategory extends ConditionalPreferenceCateg
                 || SettingsStatus.stopVideoLoopingEnabled || SettingsStatus.resumeVideoAfterScrollEnabled) {
             addPreference(new SectionHeadingPreference(context, "Staying on a video"));
         }
-        if (SettingsStatus.commentToolsEnabled) {
+        if (SettingsStatus.commentToolsEnabled || SettingsStatus.commentShrinkControlEnabled) {
             addPreference(new TogglePreference(context, "Pause the video while comments are open",
                     "Pauses the video behind the comment sheet while you read. "
                             + "It plays on from the same spot when the sheet closes.",
                     Settings.PAUSE_ON_COMMENTS));
+            addPreference(new TogglePreference(context, "Disable video shrink on comments",
+                    "Keep the video full screen when comments open instead of shrinking it. "
+                            + "Prevents status bar black scrim and screen flickering.",
+                    Settings.DISABLE_COMMENT_SHRINK));
         }
         if (SettingsStatus.fullScreenHoldEnabled) {
             addPreference(new TogglePreference(context, "Stay on the video in full screen",
