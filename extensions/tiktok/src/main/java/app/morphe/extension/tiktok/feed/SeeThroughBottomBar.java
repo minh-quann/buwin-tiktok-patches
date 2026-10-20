@@ -165,14 +165,52 @@ final class SeeThroughBottomBar {
         return Math.round(21 * density);
     }
 
+    private static java.lang.ref.WeakReference<View> bottomBarRef = new java.lang.ref.WeakReference<>(null);
+
+    static int getTotalBarHeight(Context context) {
+        View bar = bottomBarRef.get();
+        if (bar != null && bar.getHeight() > 0) {
+            return bar.getHeight();
+        }
+        if (context == null) return 0;
+        float density = context.getResources().getDisplayMetrics().density;
+        int origH = Math.round(54 * density);
+        boolean indicatorActive = isSystemIndicatorActive(bar);
+        int chin = indicatorActive ? 0 : getChinHeight(context);
+        return origH + chin;
+    }
+
+    /** Returns the Y coordinate where the bottom bar begins on screen, or fallback. */
+    static int getBottomBarTop(View contextView, int fullHeight) {
+        View bar = bottomBarRef.get();
+        if (bar != null && bar.getHeight() > 0) {
+            int top = bar.getTop();
+            if (top > 0 && top < fullHeight) {
+                return top;
+            }
+            int h = bar.getHeight();
+            if (h > 0 && h < fullHeight) {
+                return fullHeight - h;
+            }
+        }
+        Context ctx = contextView != null ? contextView.getContext() : null;
+        int totalH = getTotalBarHeight(ctx);
+        if (totalH > 0 && totalH < fullHeight) {
+            return fullHeight - totalH;
+        }
+        return fullHeight;
+    }
+
     /**
      * Adjusts the bottom bar's height and bottom padding:
      * - When system indicator is disabled: adds the chin height so the bar is comfortably elevated
-     *   and leaves a solid black border at the bottom edge of the screen (similar to iOS chin).
-     * - When system indicator is enabled: does not add chin ("bật thì không chừa nữa").
+     *   and leaves a solid black border at the bottom edge of the screen (matching iOS).
+     * - When system indicator is enabled: does not add chin.
+     * - Always ensures the entire bottom bar (including bottom chin) is solid black like iOS.
      */
     static void adjustBottomBarChin(View bar) {
         if (bar == null) return;
+        bottomBarRef = new java.lang.ref.WeakReference<>(bar);
         boolean indicatorActive = isSystemIndicatorActive(bar);
         int chin = indicatorActive ? 0 : getChinHeight(bar.getContext());
 
@@ -201,6 +239,9 @@ final class SeeThroughBottomBar {
         if (bar.getPaddingBottom() != targetPad) {
             bar.setPadding(bar.getPaddingLeft(), bar.getPaddingTop(), bar.getPaddingRight(), targetPad);
         }
+
+        // Entire bottom bar (including bottom chin) is solid black like iOS
+        bar.setBackgroundColor(Color.BLACK);
     }
 
     private static final String BLACK_CHIN_TAG = "buwin_black_chin_overlay";
@@ -305,25 +346,8 @@ final class SeeThroughBottomBar {
      */
     static void setBackgroundClear(View bar, boolean clear, boolean floating) {
         if (bar == null) return;
-        Drawable current = bar.getBackground();
-        boolean ours = current instanceof ClearBackground || current instanceof FloatingBackground;
-        if (clear) {
-            if (current == null) return;
-            if (ours && (current instanceof FloatingBackground) == floating) return;
-            if (!ours) BACKGROUNDS.put(bar, current);
-            bar.setBackground(floating
-                    ? new FloatingBackground(bar.getResources().getDisplayMetrics().density)
-                    : new ClearBackground());
-            return;
-        }
-        if (!BACKGROUNDS.containsKey(bar)) {
-            if (current instanceof ClearBackground) {
-                bar.setBackgroundColor(Color.BLACK);
-            }
-            return;
-        }
-        Drawable original = BACKGROUNDS.remove(bar);
-        if (ours) bar.setBackground(original != null ? original : new ColorDrawable(Color.BLACK));
+        // The user explicitly requires the entire bottom bar to be solid black like iOS, never see-through
+        bar.setBackgroundColor(Color.BLACK);
     }
 
     /**
