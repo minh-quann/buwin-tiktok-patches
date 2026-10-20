@@ -13,9 +13,12 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowInsets;
+import android.widget.FrameLayout;
 
 import app.morphe.extension.tiktok.settings.preference.SettingsUi;
 
@@ -198,6 +201,57 @@ final class SeeThroughBottomBar {
         int targetPad = origPad + chin;
         if (bar.getPaddingBottom() != targetPad) {
             bar.setPadding(bar.getPaddingLeft(), bar.getPaddingTop(), bar.getPaddingRight(), targetPad);
+        }
+    }
+
+    private static final String BLACK_CHIN_TAG = "buwin_black_chin_overlay";
+
+    /**
+     * Ensures a solid black chin is painted at the bottom edge of the screen when the system
+     * navigation indicator is disabled ("bôi đen mép dưới màn hình"), preventing the next video
+     * in ViewPager from peeking through underneath the elevated bottom bar.
+     */
+    static void updateChinOverlay(Activity activity, boolean clearDisplay) {
+        if (activity == null || activity.isFinishing()) return;
+        Window window = activity.getWindow();
+        if (window == null) return;
+        View decor = window.getDecorView();
+        if (!(decor instanceof ViewGroup)) return;
+        ViewGroup root = (ViewGroup) decor;
+
+        boolean indicatorActive = isSystemIndicatorActive(root);
+        int chin = (indicatorActive || clearDisplay) ? 0 : getChinHeight(activity);
+
+        View chinView = root.findViewWithTag(BLACK_CHIN_TAG);
+        if (chin <= 0) {
+            if (chinView != null && chinView.getVisibility() != View.GONE) {
+                chinView.setVisibility(View.GONE);
+            }
+            return;
+        }
+
+        if (chinView == null) {
+            chinView = new View(activity);
+            chinView.setTag(BLACK_CHIN_TAG);
+            chinView.setBackgroundColor(Color.BLACK);
+            chinView.setClickable(false);
+            chinView.setFocusable(false);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, chin, Gravity.BOTTOM);
+            root.addView(chinView, lp);
+        } else {
+            ViewGroup.LayoutParams lp = chinView.getLayoutParams();
+            if (lp != null && lp.height != chin) {
+                lp.height = chin;
+                chinView.setLayoutParams(lp);
+            }
+            if (chinView.getVisibility() != View.VISIBLE) {
+                chinView.setVisibility(View.VISIBLE);
+            }
+        }
+        chinView.bringToFront();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            chinView.setElevation(9999f);
         }
     }
 
