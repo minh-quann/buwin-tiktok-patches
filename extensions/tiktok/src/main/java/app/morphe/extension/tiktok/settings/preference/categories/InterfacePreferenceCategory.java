@@ -638,12 +638,6 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     + "• Shift video up (Zero crop): Moves the video up under the status bar with 1:1 scale (zero horizontal cropping).\n"
                     + "• Shift video up (Split margin): Shifts video up halfway to balance the black border evenly between top and bottom (zero cropping).\n"
                     + "• Ambient gradient (YouTube style): Moves video under status bar with a soft ambient gradient overlay for optimal clock visibility."));
-            addPreference(new TogglePreference(
-                    context,
-                    "Disable video shrink on comments",
-                    "Keep video full screen behind comments instead of shrinking it, preventing jitter when opening or closing comments.",
-                    Settings.DISABLE_COMMENT_SHRINK
-            ));
             addPreference(new ChoicePreference(context, "Burn-in guard", Settings.BURN_IN_GUARD,
                     new String[]{"Off", "Dim when idle", "Dim when idle and shift"},
                     new String[]{BurnInGuard.OFF, BurnInGuard.DIM, BurnInGuard.DIM_AND_SHIFT})

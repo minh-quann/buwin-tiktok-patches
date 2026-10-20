@@ -353,6 +353,27 @@ public final class FeedVisibility {
     }
 
     /**
+     * Whether the comment sheet is actively covering the feed video.
+     * When the sheet is dismissed and sliding off screen (top edge past 75% of screen height),
+     * this returns false so the video can seamlessly resume edge-to-edge fill without a
+     * 1-frame status bar blackout or jump.
+     */
+    public static boolean isCommentSheetCoveringFeed(Activity activity) {
+        if (!isCommentSheetVisible(activity)) return false;
+        View sheet = commentSheetReference.get();
+        if (sheet != null && sheet.getHeight() > 0) {
+            int[] loc = new int[2];
+            sheet.getLocationOnScreen(loc);
+            int sheetY = loc[1];
+            int screenHeight = activity.getResources().getDisplayMetrics().heightPixels;
+            if (screenHeight > 0 && sheetY > screenHeight * 0.75f) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Whether this activity's comment sheet has been found before and is still its own, open or
      * parked below the screen. Only the remembered view is read, so it costs no lookup.
      */
