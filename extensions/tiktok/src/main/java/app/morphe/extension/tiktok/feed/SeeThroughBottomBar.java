@@ -165,30 +165,6 @@ final class SeeThroughBottomBar {
         return Math.round(21 * density);
     }
 
-    private static java.lang.ref.WeakReference<View> bottomBarRef = new java.lang.ref.WeakReference<>(null);
-
-    /** Returns the Y coordinate where the bottom bar begins on screen, or fallback. */
-    static int getBottomBarTop(View contextView, int fullHeight) {
-        View bar = bottomBarRef.get();
-        if (bar != null && bar.getHeight() > 0) {
-            int top = bar.getTop();
-            if (top > 0 && top < fullHeight) {
-                return top;
-            }
-            int h = bar.getHeight();
-            if (h > 0 && h < fullHeight) {
-                return fullHeight - h;
-            }
-        }
-        Context ctx = contextView != null ? contextView.getContext() : null;
-        if (ctx == null) return fullHeight;
-        float density = ctx.getResources().getDisplayMetrics().density;
-        int barH = Math.round(54 * density);
-        boolean indicatorActive = isSystemIndicatorActive(contextView);
-        int chin = indicatorActive ? 0 : getChinHeight(ctx);
-        return fullHeight - barH - chin;
-    }
-
     /**
      * Adjusts the bottom bar's height and bottom padding:
      * - When system indicator is disabled: adds the chin height so the bar is comfortably elevated
@@ -197,7 +173,6 @@ final class SeeThroughBottomBar {
      */
     static void adjustBottomBarChin(View bar) {
         if (bar == null) return;
-        bottomBarRef = new java.lang.ref.WeakReference<>(bar);
         boolean indicatorActive = isSystemIndicatorActive(bar);
         int chin = indicatorActive ? 0 : getChinHeight(bar.getContext());
 

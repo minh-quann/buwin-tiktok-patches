@@ -292,8 +292,7 @@ public final class SeeThroughStatusBar {
 
         boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(player);
         int chin = indicatorActive ? 0 : SeeThroughBottomBar.getChinHeight(player.getContext());
-        int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
-        int targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
+        int targetHeight = fullHeight - chin;
         if (targetHeight <= 0) targetHeight = fullHeight;
 
         // Apply black chin strictly inside the feed cell (view_rootview) so it never leaks onto dialogs or other screens
@@ -302,7 +301,7 @@ public final class SeeThroughStatusBar {
         }
 
         if (doScale) {
-            // Scale mode: center vertically and scale to fill from top to targetHeight (above black chin)
+            // Scale mode: center vertically and scale to fill from y=0 to targetHeight (above black chin)
             View targetView = surface != null ? surface : player;
             int vWidth = targetView.getWidth();
             int vHeight = targetView.getHeight();
@@ -310,7 +309,8 @@ public final class SeeThroughStatusBar {
             if (vWidth > 0 && vHeight > vWidth) {
                 unclipAncestors(targetView, cell);
 
-                float neededScale = (float) targetHeight / (float) vHeight;
+                // Add 2px to guarantee zero sub-pixel hairline gaps at top (y=0) and bottom
+                float neededScale = (float) (targetHeight + 2) / (float) vHeight;
                 if (neededScale < 1f) neededScale = 1f;
                 if (neededScale > MAX_FILL_SCALE) neededScale = MAX_FILL_SCALE;
 
