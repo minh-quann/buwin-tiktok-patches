@@ -292,7 +292,8 @@ public final class SeeThroughStatusBar {
 
         boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(player);
         int chin = indicatorActive ? 0 : SeeThroughBottomBar.getChinHeight(player.getContext());
-        int targetHeight = fullHeight - chin;
+        int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
+        int targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
         if (targetHeight <= 0) targetHeight = fullHeight;
 
         if (doScale) {
