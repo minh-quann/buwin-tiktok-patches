@@ -17,6 +17,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 
 import java.util.Map;
@@ -47,6 +50,54 @@ public final class SeeThroughStatusBar {
     private static final Map<View, Float> SHIFTED = new WeakHashMap<>();
 
     private SeeThroughStatusBar() {
+    }
+
+    /**
+     * Immediately applies edge-to-edge window flags, display cutout SHORT_EDGES and transparent status bar
+     * synchronously upon Activity creation, avoiding any multi-frame layout jitter or delays.
+     */
+    public static void enableEdgeToEdge(Activity activity) {
+        if (activity == null) return;
+        try {
+            Window window = activity.getWindow();
+            if (window == null) return;
+            boolean statusBar = Settings.HIDE_STATUS_BAR.get();
+            boolean seeThrough = Settings.SEE_THROUGH_STATUS_BAR.get();
+            if (!statusBar && !seeThrough) return;
+
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(Color.TRANSPARENT);
+
+            if (Build.VERSION.SDK_INT >= 28) {
+                WindowManager.LayoutParams attrs = window.getAttributes();
+                if (attrs.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                    attrs.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                    window.setAttributes(attrs);
+                }
+            }
+
+            View decor = window.getDecorView();
+            if (decor != null) {
+                if (statusBar) {
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        WindowInsetsController controller = decor.getWindowInsetsController();
+                        if (controller != null) {
+                            controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                            controller.hide(WindowInsets.Type.statusBars());
+                        }
+                    } else {
+                        decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                    }
+                } else {
+                    decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /** One layout pass: clears the bar while {@code wanted}, and gives its color back otherwise. */

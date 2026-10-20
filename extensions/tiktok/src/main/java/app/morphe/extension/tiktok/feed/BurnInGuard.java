@@ -47,6 +47,8 @@ public final class BurnInGuard {
     public static final String OFF = "off";
     public static final String DIM = "dim";
     public static final String DIM_AND_SHIFT = "dim_shift";
+    public static final String HIDE = "hide";
+    public static final String HIDE_AND_SHIFT = "hide_shift";
 
     /** How long the screen goes untouched before the controls dim. */
     static final long IDLE_AFTER_MS = 5_000L;
@@ -86,7 +88,8 @@ public final class BurnInGuard {
 
     static String mode() {
         String value = Settings.BURN_IN_GUARD.get();
-        return DIM.equals(value) || DIM_AND_SHIFT.equals(value) ? value : OFF;
+        return DIM.equals(value) || DIM_AND_SHIFT.equals(value)
+                || HIDE.equals(value) || HIDE_AND_SHIFT.equals(value) ? value : OFF;
     }
 
     /**
@@ -114,14 +117,16 @@ public final class BurnInGuard {
             fingerDown = false;
         }
         guarding = on;
-        boolean canDim = on && chosen > IDLE_LEVEL;
+        boolean isHideMode = HIDE.equals(mode) || HIDE_AND_SHIFT.equals(mode);
+        int targetIdleLevel = isHideMode ? 0 : IDLE_LEVEL;
+        boolean canDim = on && chosen > targetIdleLevel;
         dimmed = canDim && !fingerDown && now - touchedAt >= IDLE_AFTER_MS;
-        boolean shifting = on && DIM_AND_SHIFT.equals(mode);
+        boolean shifting = on && (DIM_AND_SHIFT.equals(mode) || HIDE_AND_SHIFT.equals(mode));
         place(activity, shifting, now);
         // No dim is timed while a finger is down; its lift asks for the pass that times one.
         schedule(Math.min(canDim && !dimmed && !fingerDown ? touchedAt + IDLE_AFTER_MS : Long.MAX_VALUE,
                 shifting ? (now / SHIFT_EVERY_MS + 1) * SHIFT_EVERY_MS : Long.MAX_VALUE));
-        return dimmed ? IDLE_LEVEL : chosen;
+        return dimmed ? targetIdleLevel : chosen;
     }
 
     /** The place the content is in at {@code now}, in steps of {@link #STEP_DP}. */

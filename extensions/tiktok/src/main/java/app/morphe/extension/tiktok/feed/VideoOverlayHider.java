@@ -469,6 +469,7 @@ public final class VideoOverlayHider {
         if (activity == null) {
             return;
         }
+        SeeThroughStatusBar.enableEdgeToEdge(activity);
         if (FeedVisibility.isDetailPager(activity)) RememberClearDisplayPatch.onPageOpened(activity);
         FRONT.add(activity);
         Utils.runOnMainThread(() -> {
@@ -1939,7 +1940,7 @@ public final class VideoOverlayHider {
                     } else if (target == TOP_SEARCH_BAR_TARGET || target == TOP_SEARCH_SCRIM_TARGET) {
                         // The way back out of the page: faded like the tabs, never past the floor,
                         // and out of sight only until TikTok's own clear lands on the page.
-                        setFaded(view, topBarHeld ? 0 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel), fadedClear);
+                        setFaded(view, (topBarHeld || fadeLevel == 0) ? 0 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel), fadedClear);
                     } else if (target == DETAIL_SEARCH_BOX_TARGET || target == STATUS_BAR_SCRIM_TARGET) {
                         // Invisible, not gone: the bar keeps its shape and Back stays put, and
                         // the cell's band keeps its place.
@@ -2036,11 +2037,22 @@ public final class VideoOverlayHider {
                         // The Following stories pill is the strip's neighbour at the top of the
                         // feed, so it fades with the tabs; it was only ever hidden (#84).
                         if (target == BOTTOM_TABS_TARGET) {
-                            fadeTabIcons(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                            if (fadeLevel == 0) {
+                                fadeTabIcons(view, 0);
+                                setHidden(view, true, View.INVISIBLE);
+                            } else {
+                                fadeTabIcons(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                                setHidden(view, wanted);
+                            }
                         } else {
-                            setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                            if (fadeLevel == 0) {
+                                setFaded(view, 0);
+                                setHidden(view, true, View.INVISIBLE);
+                            } else {
+                                setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
+                                setHidden(view, wanted);
+                            }
                         }
-                        setHidden(view, wanted);
                     } else if (target == BOTTOM_SPACER_TARGET) {
                         setHidden(view, wanted);
                     } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET

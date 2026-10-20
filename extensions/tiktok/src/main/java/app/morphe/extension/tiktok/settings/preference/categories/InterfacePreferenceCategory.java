@@ -639,9 +639,9 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     + "• Shift video up (Split margin): Shifts video up halfway to balance the black border evenly between top and bottom (zero cropping).\n"
                     + "• Ambient gradient (YouTube style): Moves video under status bar with a soft ambient gradient overlay for optimal clock visibility."));
             addPreference(new ChoicePreference(context, "Burn-in guard", Settings.BURN_IN_GUARD,
-                    new String[]{"Off", "Dim when idle", "Dim when idle and shift"},
-                    new String[]{BurnInGuard.OFF, BurnInGuard.DIM, BurnInGuard.DIM_AND_SHIFT})
-                    .withNote("For OLED screens. After 5 seconds without a touch, the buttons, caption and tabs over the video dim to a quarter, and your next touch brings them back. Shift also moves everything on the feed a few pixels every 2 minutes."));
+                    new String[]{"Off", "Dim when idle", "Dim when idle and shift", "Hide completely when idle", "Hide completely and shift"},
+                    new String[]{BurnInGuard.OFF, BurnInGuard.DIM, BurnInGuard.DIM_AND_SHIFT, BurnInGuard.HIDE, BurnInGuard.HIDE_AND_SHIFT})
+                    .withNote("For OLED screens. After 5 seconds without a touch, the buttons, caption and tabs over the video dim or hide completely, and your next touch brings them back. Shift also moves everything on the feed a few pixels every 2 minutes."));
         }
     }
 
