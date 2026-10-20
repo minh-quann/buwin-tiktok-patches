@@ -2045,8 +2045,12 @@ public final class VideoOverlayHider {
                         setHidden(view, wanted);
                     } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET
                             || target == CLEAR_PHOTO_EXIT_TARGET) {
-                        if (view.getTranslationY() != 0f) {
-                            view.setTranslationY(0f);
+                        boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(view);
+                        float density = view.getResources().getDisplayMetrics().density;
+                        int lift = indicatorActive ? 0 : Math.round(6.5f * density);
+                        float targetY = -lift;
+                        if (view.getTranslationY() != targetY) {
+                            view.setTranslationY(targetY);
                         }
                         setHidden(view, wanted);
                     } else if (target == DETAIL_COMMENT_STRIP_TARGET) {
