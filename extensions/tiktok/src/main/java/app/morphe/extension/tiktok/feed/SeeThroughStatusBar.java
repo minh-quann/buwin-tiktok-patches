@@ -313,18 +313,18 @@ public final class SeeThroughStatusBar {
         boolean clearDisplay = RememberClearDisplayPatch.isClearDisplayNow()
                 || RememberClearDisplayPatch.isCarryingClear();
 
-        int targetHeight = fullHeight;
-        if (!clearDisplay) {
+        int targetHeight;
+        if (clearDisplay) {
+            targetHeight = fullHeight - chin;
+        } else {
             int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
             targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
         }
         if (targetHeight <= 0) targetHeight = fullHeight;
 
-        // Ensure the cell under the bottom bar is also solid black to prevent any leakage
-        // When in Clear Display, NEVER draw a black chin - video must fill the screen without obstructing bars
-        int bottomBlackHeight = clearDisplay ? 0 : (fullHeight - targetHeight);
+        // Clean up any legacy cell chin so it never obstructs video content
         if (cell != null) {
-            SeeThroughBottomBar.updateCellChin(cell, wanted ? bottomBlackHeight : 0);
+            SeeThroughBottomBar.updateCellChin(cell, 0);
         }
 
         if (doScale) {

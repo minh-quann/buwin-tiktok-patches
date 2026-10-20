@@ -20,6 +20,7 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.widget.FrameLayout;
 
+import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
 import app.morphe.extension.tiktok.settings.preference.SettingsUi;
 
 import java.util.List;
@@ -149,6 +150,7 @@ final class SeeThroughBottomBar {
     static int getChinHeight(Context context) {
         if (context == null) return 0;
         float density = context.getResources().getDisplayMetrics().density;
+        int chin = 0;
         int resId = context.getResources().getIdentifier("navigation_bar_gesture_height", "dimen", "android");
         if (resId <= 0) {
             resId = context.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
@@ -157,12 +159,13 @@ final class SeeThroughBottomBar {
             try {
                 int navH = context.getResources().getDimensionPixelSize(resId);
                 if (navH > 0 && navH <= Math.round(48 * density)) {
-                    return navH;
+                    chin = navH;
                 }
             } catch (Exception ignored) {
             }
         }
-        return Math.round(21 * density);
+        int fallback = Math.round(22.5f * density); // ~72px on 515/528dpi (Honor Magic 9 Pro Max)
+        return chin > 0 ? Math.max(chin, fallback) : fallback;
     }
 
     private static java.lang.ref.WeakReference<View> bottomBarRef = new java.lang.ref.WeakReference<>(null);
@@ -247,59 +250,45 @@ final class SeeThroughBottomBar {
     private static final String BLACK_CHIN_TAG = "buwin_black_chin_overlay";
 
     /**
-     * Cleans up any legacy chin overlay that was previously attached to decorView so that
-     * it NEVER blocks dialogs, login sheets, comments, or other screens.
+     * Ensures a solid black chin is painted at the bottom edge of the screen when the system
+     * navigation indicator is disabled ("bôi đen mép dưới màn hình"), preventing the next video
+     * in ViewPager from peeking through underneath the elevated bottom bar or during clear display.
+     * Attached strictly to MainActivity's decorView and only visible while actively on the feed.
      */
-    static void updateChinOverlay(Activity activity, boolean clearDisplay) {
+    static void updateChinOverlay(Activity activity) {
         if (activity == null || activity.isFinishing()) return;
+        if (!activity.getClass().getSimpleName().contains("MainActivity")) return;
+
         Window window = activity.getWindow();
         if (window == null) return;
         View decor = window.getDecorView();
         if (!(decor instanceof ViewGroup)) return;
         ViewGroup root = (ViewGroup) decor;
 
-        View chinView = root.findViewWithTag(BLACK_CHIN_TAG);
-        if (chinView != null) {
-            root.removeView(chinView);
-        }
-    }
+        boolean indicatorActive = isSystemIndicatorActive(root);
+        int chin = indicatorActive ? 0 : getChinHeight(activity);
 
-    /**
-     * Ensures a solid black chin is painted at the bottom edge of the feed cell (view_rootview)
-     * ONLY when the system navigation indicator is disabled, preventing the next video in
-     * ViewPager from peeking through. It is attached strictly to the feed cell so it NEVER
-     * appears on dialogs, login sheets, profile, inbox or search screens.
-     */
-    static void updateCellChin(View cell, int chin) {
-        if (!(cell instanceof ViewGroup)) return;
-        ViewGroup cellGroup = (ViewGroup) cell;
-        View chinView = cellGroup.findViewWithTag(BLACK_CHIN_TAG);
-        if (chin <= 0) {
-            if (chinView != null) {
-                cellGroup.removeView(chinView);
+        boolean shouldShow = (chin > 0)
+                && FeedVisibility.isOnFeed(activity)
+                && !FeedVisibility.isCommentSheetVisible(activity);
+
+        View chinView = root.findViewWithTag(BLACK_CHIN_TAG);
+        if (!shouldShow) {
+            if (chinView != null && chinView.getVisibility() != View.GONE) {
+                chinView.setVisibility(View.GONE);
             }
             return;
         }
 
         if (chinView == null) {
-            chinView = new View(cell.getContext());
+            chinView = new View(activity);
             chinView.setTag(BLACK_CHIN_TAG);
             chinView.setBackgroundColor(Color.BLACK);
             chinView.setClickable(false);
             chinView.setFocusable(false);
-            ViewGroup.LayoutParams lp;
-            if (cellGroup instanceof FrameLayout) {
-                lp = new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, chin, Gravity.BOTTOM);
-            } else if (cellGroup instanceof android.widget.RelativeLayout) {
-                android.widget.RelativeLayout.LayoutParams rlp = new android.widget.RelativeLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, chin);
-                rlp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_BOTTOM);
-                lp = rlp;
-            } else {
-                lp = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, chin);
-            }
-            cellGroup.addView(chinView, lp);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, chin, Gravity.BOTTOM);
+            root.addView(chinView, lp);
         } else {
             ViewGroup.LayoutParams lp = chinView.getLayoutParams();
             if (lp != null && lp.height != chin) {
@@ -311,6 +300,21 @@ final class SeeThroughBottomBar {
             }
         }
         chinView.bringToFront();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            chinView.setElevation(9999f);
+        }
+    }
+
+    /**
+     * Cleans up any leftover chin view that was previously attached to cell.
+     */
+    static void updateCellChin(View cell, int chin) {
+        if (!(cell instanceof ViewGroup)) return;
+        ViewGroup cellGroup = (ViewGroup) cell;
+        View chinView = cellGroup.findViewWithTag(BLACK_CHIN_TAG);
+        if (chinView != null) {
+            cellGroup.removeView(chinView);
+        }
     }
 
 
