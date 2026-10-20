@@ -265,22 +265,19 @@ public final class SeeThroughStatusBar {
     static void fill(View player, boolean wanted) {
         if (!(player instanceof ViewGroup)) return;
         if (wanted && fitWins()) wanted = false;
-        if (wanted) {
-            Activity activity = activityOf(player);
-            if (activity != null && FeedVisibility.isCommentSheetVisible(activity)) {
-                wanted = false;
-            }
-        }
-
         ViewGroup group = (ViewGroup) player;
         View surface = findSurface(group);
 
-        // If TikTok is actively scaling down the player/surface for comments or transition, yield immediately
-        if (wanted) {
-            if ((player.getScaleX() < 0.98f && !FILLED.containsKey(player))
-                    || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface))) {
-                wanted = false;
-            }
+        Activity activity = activityOf(player);
+        boolean commentsOpen = activity != null && FeedVisibility.isCommentSheetVisible(activity);
+        boolean scalingForComments = (player.getScaleX() < 0.98f && !FILLED.containsKey(player))
+                || (surface != null && surface.getScaleX() < 0.98f && !FILLED.containsKey(surface));
+
+        if (commentsOpen || scalingForComments) {
+            // While comments are open or actively animating, do not reset or fight TikTok's animation.
+            // If surface was already scaled/shifted to fill status bar, KEEP IT AS-IS so that when comments
+            // close, video seamlessly returns to edge-to-edge without any status bar black flash or pop-in jump!
+            return;
         }
 
         String style = Settings.STATUS_BAR_STYLE.get();
@@ -298,7 +295,7 @@ public final class SeeThroughStatusBar {
             }
         }
         if (fullHeight <= 0) {
-            Activity activity = activityOf(player);
+            if (activity == null) activity = activityOf(player);
             if (activity != null && activity.getWindow() != null && activity.getWindow().getDecorView() != null) {
                 fullHeight = activity.getWindow().getDecorView().getHeight();
             }

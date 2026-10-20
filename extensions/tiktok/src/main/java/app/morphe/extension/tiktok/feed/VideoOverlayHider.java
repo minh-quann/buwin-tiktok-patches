@@ -704,7 +704,7 @@ public final class VideoOverlayHider {
                 wanted[STATUS_BAR_SPACER_TARGET] = statusBar || seeThroughStatusBar;
                 wanted[STATUS_BAR_SCRIM_TARGET] = statusBar || seeThroughStatusBar;
                 // Grown, not hidden: see SeeThroughStatusBar.fill. Yields when comments sheet is open to prevent flicker.
-                wanted[PLAYER_VIEW_TARGET] = seeThroughStatusBar && !commentsOpen;
+                wanted[PLAYER_VIEW_TARGET] = seeThroughStatusBar;
                 wanted[BOTTOM_SPACER_TARGET] = seeThroughBar && SeeThroughBottomBar.collapseAllowed();
                 for (int i = 0; i < RAIL_BUTTON_IDS.length; i++) {
                     wanted[RAIL_TARGET_START + i] = rail[i] || carryHides;
