@@ -1930,8 +1930,7 @@ public final class VideoOverlayHider {
                             setTransparent(view, false);
                             setFaded(view, fadeLevel, fadedClear);
                         }
-                        boolean clearMode = clearOn();
-                        int chin = (clearMode || SeeThroughBottomBar.isSystemIndicatorActive(view))
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view)
                                 ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                         float targetY = -chin;
                         if (view.getTranslationY() != targetY) {
@@ -1960,8 +1959,7 @@ public final class VideoOverlayHider {
                         android.view.ViewParent frame = view.getParent();
                         View targetView = frame instanceof View ? (View) frame : view;
                         setTransparent(targetView, wanted);
-                        boolean clearMode = clearOn();
-                        int chin = (clearMode || SeeThroughBottomBar.isSystemIndicatorActive(view))
+                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view)
                                 ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
                         float targetY = -chin;
                         if (view.getTranslationY() != targetY) {
