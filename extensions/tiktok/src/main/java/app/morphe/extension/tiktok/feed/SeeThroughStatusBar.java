@@ -391,8 +391,9 @@ public final class SeeThroughStatusBar {
         if (!RememberClearDisplayPatch.isClearDisplayNow() && !RememberClearDisplayPatch.isCarryingClear()) {
             height = SeeThroughBottomBar.getBottomBarTop(cell, height);
         }
+        int[] stable = HoldVideoViewport.size(video, width, height);
         View parent = (View) video.getParent();
-        return new float[]{width, height,
+        return new float[]{stable[0], stable[1],
                 renderOrigin(parent, cell, true) + parent.getPaddingLeft(),
                 renderOrigin(parent, cell, false) + parent.getPaddingTop()};
     }
@@ -515,6 +516,10 @@ public final class SeeThroughStatusBar {
             targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : fullHeight;
         }
         if (targetHeight <= 0) targetHeight = fullHeight;
+        if (doScale) {
+            int width = cell != null ? cell.getWidth() : player.getResources().getDisplayMetrics().widthPixels;
+            targetHeight = HoldVideoViewport.size(player, width, targetHeight)[1];
+        }
 
         if (doScale && StatusBarVideoFill.handles(player)) {
             // Native layout owns both dimensions and offsets; the bind hook already released

@@ -26,3 +26,5 @@ Trang cá nhân phải giữ khoảng status bar gốc cho header/nút, không d
 Crop phải dựa trên kích thước luồng gốc: chỉ fill video dọc, giữ nguyên video ngang và nút toàn màn hình. Trong chế độ fill, chặn native comment-shrink trước animation để đóng sheet không nhảy từ khung nhỏ sang fill. LIVE preview dùng SurfaceView riêng: sửa onMeasure native, chỉ crop surface, nâng cả nhóm tips/user và card thương mại ở đáy; không scale card hoặc áp dụng vào phòng LIVE đã mở.
 
 Burn-in pixel shift chỉ được dịch foreground controls (khử trùng lặp cha/con); tuyệt đối không dịch android.R.id.content, player/surface hoặc nền bottom bar. Dịch Activity làm lộ nền cửa sổ thành viền đen đổi bên mỗi 2 phút; tăng crop không sửa được lỗi đó.
+
+Nhấn giữ cạnh để tăng tốc chỉ được đổi tốc độ và chrome; chốt viewport trước khi native EdgeSpeedupAssem ẩn bottom bar/clear UI, giữ tới khi bố cục trở lại sau release. Không tính crop lại theo visibility tạm thời của thanh điều hướng, không làm video phóng/thu theo thao tác giữ x2.

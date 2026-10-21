@@ -15,6 +15,7 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
@@ -163,7 +164,33 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
     val videoFields = liveSize.implementation!!.instructions.filter { it.opcode == Opcode.IPUT }
         .mapNotNull { it.getReference<FieldReference>() }.filter { it.definingClass == liveType && it.type == "I" }
     check(videoFields.size == 2) { "LIVE preview no longer stores one width and one height" }
+    // The native edge gesture hides the bottom tabs/enters clear mode while holding 2x.
+    // Freeze before that UI event, and release only after the original geometry settles.
+    val edgeType = "Lcom/ss/android/ugc/aweme/feed/longvideo/edgespeedup/EdgeSpeedupAssem;"
+    val edge = classDefBy(edgeType)
+    val holdHooks = listOf(
+        listOf("F", "F") to ("ripple_shown_count" to "begin"),
+        listOf("Z") to ("speedup_duration" to "end"),
+    ).map { (parameters, keyAndHook) ->
+        val method = edge.methods.single { method ->
+            method.parameterTypes == parameters && method.returnType == "V" &&
+                method.implementation?.instructions?.any {
+                    it.getReference<StringReference>()?.string == keyAndHook.first
+                } == true
+        }
+        val code = method.implementation!!.instructions.toList()
+        val state = checkNotNull(code.first().getReference<FieldReference>())
+        check(code.first().opcode == Opcode.IGET_BOOLEAN && state.definingClass == edgeType)
+        val writes = code.indices.filter { code[it].opcode == Opcode.IPUT_BOOLEAN &&
+                code[it].getReference<FieldReference>()?.toString() == state.toString() }
+        check(writes.size == 1) { "Native speed hold: ambiguous active-state write" }
+        Triple(method.name, writes.single() + 1, keyAndHook.second)
+    }
     return {
+        holdHooks.forEach { (name, index, hook) ->
+            mutableClassDefBy(edgeType).methods.single { it.name == name }.addInstructions(index,
+                "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/feed/HoldVideoViewport;->$hook(Ljava/lang/Object;)V")
+        }
         val mutable = mutableClassDefBy(owner)
         mutable.interfaces.add(listener)
         listOf(measure, draw, insets, attach, detach, preDraw).forEach { mutable.methods.add(it) }
