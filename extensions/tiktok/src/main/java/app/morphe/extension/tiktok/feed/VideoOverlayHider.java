@@ -706,7 +706,8 @@ public final class VideoOverlayHider {
                 wanted[DETAIL_SEARCH_BOX_TARGET] = detailSearchBox;
                 wanted[STATUS_BAR_SPACER_TARGET] = true;
                 wanted[STATUS_BAR_SCRIM_TARGET] = true;
-                // Grown, not hidden: see SeeThroughStatusBar.fill. Yields when comments sheet is open to prevent flicker.
+                // Native adaption fills the video before drawing; SeeThroughStatusBar keeps a
+                // draw-time fallback for APKs without the optional VideoFit hook.
                 wanted[PLAYER_VIEW_TARGET] = !detailPager;
                 wanted[BOTTOM_SPACER_TARGET] = seeThroughBar && SeeThroughBottomBar.collapseAllowed();
                 for (int i = 0; i < RAIL_BUTTON_IDS.length; i++) {

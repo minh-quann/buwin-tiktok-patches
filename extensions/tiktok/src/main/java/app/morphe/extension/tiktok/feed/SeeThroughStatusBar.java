@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
+import app.morphe.extension.shared.settings.BuwinPause;
+import app.morphe.extension.tiktok.interaction.StatusBarVideoFill;
 import app.morphe.extension.tiktok.cleardisplay.RememberClearDisplayPatch;
 import app.morphe.extension.tiktok.settings.Settings;
 import app.morphe.extension.tiktok.settings.SettingsStatus;
@@ -269,6 +271,7 @@ public final class SeeThroughStatusBar {
         View current = view;
         View best = null;
         while (current != null) {
+            if (current.getId() == android.R.id.content) return best;
             if ("view_rootview".equals(getViewIdName(current))) {
                 return current;
             }
@@ -346,12 +349,95 @@ public final class SeeThroughStatusBar {
         }
     }
 
+    public static boolean wantsNativeFill(View video) {
+        if (BuwinPause.isPaused() || !SettingsStatus.videoOverlaysEnabled || fitWins()
+                || !Settings.STATUS_BAR_STYLE_SCALE.equals(Settings.STATUS_BAR_STYLE.get())) return false;
+        Activity activity = activityOf(video);
+        return FeedVisibility.isFeedWindow(activity) && !FeedVisibility.isDetailPager(activity)
+                && FeedVisibility.isOnFeed(activity);
+    }
+
+    /** Stable cell viewport used by the native VideoAdaptionResult hook, including status space. */
+    public static float[] nativeFillViewport(View video) {
+        if (!wantsNativeFill(video)) return null;
+        View cell = findCellRoot(video);
+        // The fallback must stop inside the content boundary, never at the full DecorView:
+        // that includes system insets and the bottom reserve outside the video viewport.
+        View current = video;
+        while (current.getParent() instanceof View) {
+            View parent = (View) current.getParent();
+            if (parent.getId() == android.R.id.content) {
+                if (cell == null || cell == parent || cell.getParent() == null) cell = current;
+                break;
+            }
+            current = parent;
+        }
+        if (cell == null || cell == video || !(video.getParent() instanceof View)) return null;
+        int width = cell.getMeasuredWidth() > 0 ? cell.getMeasuredWidth() : cell.getWidth();
+        int height = cell.getMeasuredHeight() > 0 ? cell.getMeasuredHeight() : cell.getHeight();
+        if (width <= 0 || height <= 0) return null;
+        if (!RememberClearDisplayPatch.isClearDisplayNow() && !RememberClearDisplayPatch.isCarryingClear()) {
+            height = SeeThroughBottomBar.getBottomBarTop(cell, height);
+        }
+        View parent = (View) video.getParent();
+        return new float[]{width, height, leftInParent(parent, cell), topInParent(parent, cell)};
+    }
+
+    public static void releaseFillTransforms(View nativeView) {
+        unclipAncestors(nativeView, findCellRoot(nativeView));
+        View surface = findLiveSurface(nativeView);
+        if (surface != null) {
+            if (FILLED.containsKey(surface)) grow(surface, 1f);
+            if (SHIFTED.containsKey(surface)) shift(surface, 0f, 0f);
+        }
+        for (View current = nativeView; current != null;) {
+            if (FILLED.containsKey(current)) grow(current, 1f);
+            if (SHIFTED.containsKey(current)) shift(current, 0f, 0f);
+            if (current.getId() == android.R.id.content) break;
+            ViewParent parent = current.getParent();
+            current = parent instanceof View ? (View) parent : null;
+        }
+    }
+
+    private static final Map<View, DrawFill> DRAW_FILLS = new WeakHashMap<>();
+
+    /** Backstop for APKs without the optional native VideoFit hook: finish before drawing. */
+    private static final class DrawFill implements android.view.ViewTreeObserver.OnPreDrawListener,
+            View.OnAttachStateChangeListener {
+        final java.lang.ref.WeakReference<View> player;
+        boolean wanted;
+        DrawFill(View view) { player = new java.lang.ref.WeakReference<>(view); }
+        @Override public boolean onPreDraw() {
+            View view = player.get();
+            if (view != null && view.isShown() && !StatusBarVideoFill.handles(view)) fill(view, wanted);
+            return true;
+        }
+        @Override public void onViewAttachedToWindow(View view) {
+            view.getViewTreeObserver().addOnPreDrawListener(this);
+        }
+        @Override public void onViewDetachedFromWindow(View view) {
+            view.getViewTreeObserver().removeOnPreDrawListener(this);
+        }
+    }
+
+    private static void followDraw(View player, boolean wanted) {
+        DrawFill follow = DRAW_FILLS.get(player);
+        if (follow == null) {
+            follow = new DrawFill(player);
+            DRAW_FILLS.put(player, follow);
+            player.addOnAttachStateChangeListener(follow);
+            if (player.isAttachedToWindow()) player.getViewTreeObserver().addOnPreDrawListener(follow);
+        }
+        follow.wanted = wanted;
+    }
+
     /**
      * One layout pass over a feed cell's player: manages video size and position
      * based on the selected {@link Settings#STATUS_BAR_STYLE}.
      */
     static void fill(View player, boolean wanted) {
         if (!(player instanceof ViewGroup)) return;
+        followDraw(player, wanted);
         if (wanted && fitWins()) wanted = false;
         ViewGroup group = (ViewGroup) player;
         View surface = findSurface(group);
@@ -402,6 +488,11 @@ public final class SeeThroughStatusBar {
         }
         if (targetHeight <= 0) targetHeight = fullHeight;
 
+        if (doScale && StatusBarVideoFill.handles(player)) {
+            // Native layout owns both dimensions and offsets; the bind hook already released
+            // any legacy surface transform before TikTok applied its result.
+            return;
+        }
         if (doScale) {
             // Scale mode: center and aspect fill from y=0 to targetHeight (meeting the solid black bottom bar)
             View targetView = surface != null ? surface : player;
@@ -439,9 +530,6 @@ public final class SeeThroughStatusBar {
                 float targetCenterY = targetHeight / 2f;
                 float currentCenterY = topInParent(targetView, cell) + vHeight / 2f;
                 float shiftY = targetCenterY - currentCenterY;
-
-                android.util.Log.i("buwin", "ScaleToFill: scale=" + neededScale + ", shiftX=" + shiftX
-                        + ", shiftY=" + shiftY + ", targetH=" + targetHeight + ", vH=" + vHeight);
 
                 if (surface != null) {
                     shift(player, 0f, 0f);

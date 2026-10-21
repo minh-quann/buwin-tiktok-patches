@@ -98,6 +98,15 @@ public final class VideoFit {
     public static Object fitted(View view, Object result) {
         if (view == null || result == null) return result;
         try {
+            // The feed's status-bar fill is decided before TikTok applies or compares its
+            // adaption result, rather than scaling an already displayed surface afterwards.
+            Object statusFill = StatusBarVideoFill.fitted(view, result);
+            if (statusFill != null) {
+                unwatch(view);
+                uncentre(view);
+                return statusFill;
+            }
+            StatusBarVideoFill.release(view);
             // The switches before the reads: this runs twice for every video the feed binds, off
             // is the default, and the reflection below is only worth paying for with one on.
             Mode mode = mode();
@@ -124,6 +133,7 @@ public final class VideoFit {
             if (centred) watch(view, videoWidth, videoHeight, width, height);
             return copy;
         } catch (Exception exception) {
+            StatusBarVideoFill.release(view);
             Logger.printException(() -> "Could not fit the video to the window", exception);
             return untouched(view, result);
         }
@@ -135,7 +145,7 @@ public final class VideoFit {
      * operator travels across unchanged. Null when the class has no {@code copy} of the shape a
      * data class generates, which is what says the result is not one this knows how to remake.
      */
-    private static Object copyOf(Object result, int width, int height, float[] offsets) {
+    static Object copyOf(Object result, int width, int height, float[] offsets) {
         Method copy = copyMethodOf(result.getClass());
         if (copy == null) return null;
         Object operator = Reflect.invoke(result, "getResultOperator");
@@ -218,7 +228,7 @@ public final class VideoFit {
      * fill on never showed TikTok keeping the centring, so this is for a build or a screen that
      * does.
      */
-    private static void uncentre(View view) {
+    static void uncentre(View view) {
         if (GRAVITY_BEFORE.isEmpty()) return;
         Integer before = GRAVITY_BEFORE.remove(view);
         if (before == null) return;

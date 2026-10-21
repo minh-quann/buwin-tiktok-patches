@@ -12,3 +12,7 @@ Nếu môi trường chặn một bước, báo rõ bước chưa hoàn tất; k
 ## CodeGraph
 
 Nếu repo có `.codegraph/`, dùng CodeGraph trước khi tìm/đọc code. Không tự tạo index.
+
+## Hiển thị feed
+
+Giữ video và giao diện tràn lên status bar như iOS theo yêu cầu của chủ repo. Khi sửa giật lúc lướt, sửa thời điểm tính/áp dụng kích thước; không tắt fill hoặc thu video xuống dưới status bar để né lỗi.
