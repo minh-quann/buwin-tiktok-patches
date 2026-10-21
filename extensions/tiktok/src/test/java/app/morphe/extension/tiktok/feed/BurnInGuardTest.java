@@ -66,6 +66,8 @@ public class BurnInGuardTest {
         clear(false);
         Settings.CLEAR_DISPLAY.save(false);
         Settings.BURN_IN_GUARD.resetToDefault();
+        Settings.BURN_IN_IDLE_TIMEOUT.resetToDefault();
+        Settings.BURN_IN_IDLE_LEVEL.resetToDefault();
         Settings.FADE_CONTROLS_OPACITY.save(100);
         SettingsStatus.videoOverlaysEnabled = overlays;
         BurnInGuard.resetForTests();
@@ -300,6 +302,21 @@ public class BurnInGuardTest {
             VideoOverlayHider.applyTo(activity);
             assertEquals("without the shift the controls go back", 0f, column.getTranslationX(), 0f);
             assertEquals(0f, column.getTranslationY(), 0f);
+        }
+    }
+
+    @Test
+    public void customIdleTimeoutChangesWhenTheControlsDim() {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
+            feed(controller.get());
+            Settings.BURN_IN_GUARD.save(BurnInGuard.DIM);
+            Settings.BURN_IN_IDLE_TIMEOUT.save(2);
+            VideoOverlayHider.applyTo(activity);
+            touch();
+            after(1_000L);
+            assertEquals("after 1s still up", 1f, column.getAlpha(), 0f);
+            after(1_000L);
+            assertEquals("after 2s it dims", DIMMED, column.getAlpha(), 0.0001f);
         }
     }
 

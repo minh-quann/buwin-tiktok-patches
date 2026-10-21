@@ -44,7 +44,7 @@ Phiên bản này được tích hợp các giải pháp tùy biến sâu về g
 
 ### 4. 🛡️ Bảo vệ màn hình OLED thông minh (Intelligent OLED Burn-In Guard)
 - **Triệt tiêu viền đen dịch chuyển 7px:** Đặt bước dịch chuyển `STEP_DP = 0.0f`, cố định tâm hiển thị video, chấm dứt hoàn toàn hiện tượng lệch khung hình gây viền đen $7\text{px}$ khó chịu.
-- **Duy trì cơ chế làm mờ bảo vệ điểm ảnh:** Vẫn giữ nguyên 100% tính năng tự động làm mờ nhẹ 25% sau 5 giây không có tương tác cảm ứng, bảo vệ tấm nền OLED cao cấp chống hiện tượng lưu ảnh (burn-in) do các icon tĩnh.
+- **Duy trì cơ chế làm mờ bảo vệ điểm ảnh:** Tự động làm mờ nhẹ icon khi không có tương tác cảm ứng với thanh trượt tùy chỉnh thời gian chờ (1 đến 10 giây, mặc định 5s) và độ mờ (0% đến 100%), bảo vệ tấm nền OLED cao cấp chống hiện tượng lưu ảnh (burn-in) do các icon tĩnh.
 
 ### 5. 🏷️ Nhận diện thương hiệu Buwin đồng bộ 100%
 - Toàn bộ bytecode Smali, giao diện menu, trang thông tin Giới thiệu, bảng điều khiển chẩn đoán và thông báo hệ thống đều mang tên **Buwin**.

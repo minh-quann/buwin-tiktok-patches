@@ -645,6 +645,15 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     .withNote("For OLED screens. After 5 seconds without a touch, the buttons, caption and tabs over the video dim, and your next touch brings them back. Shift also moves everything on the feed a few pixels every 2 minutes."));
             addPreference(new SeekBarPreference(
                     context,
+                    "Idle delay",
+                    "How long the screen goes untouched before controls dim",
+                    Settings.BURN_IN_IDLE_TIMEOUT,
+                    1,
+                    10,
+                    "s"
+            ));
+            addPreference(new SeekBarPreference(
+                    context,
                     "Idle opacity",
                     "Opacity of the controls when idle (set to 0% to hide completely)",
                     Settings.BURN_IN_IDLE_LEVEL,

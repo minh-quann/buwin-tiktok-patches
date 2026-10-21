@@ -58,7 +58,7 @@ public class SeekBarPreference extends DialogPreference {
     }
 
     private String formatDisplay(int val) {
-        if (val == 0) {
+        if (val == 0 && "%".equals(unit)) {
             return "0% (Biến mất hoàn toàn)";
         }
         return val + unit;

@@ -904,6 +904,19 @@ public class Settings extends BaseSettings {
                 }
             }
     ).withRange(0, 100);
+    public static final IntegerSetting BURN_IN_IDLE_TIMEOUT = new IntegerSetting(
+            "burn_in_idle_timeout", 5, false, new Setting.Availability() {
+                @Override
+                public boolean isAvailable() {
+                    return !"off".equals(BURN_IN_GUARD.savedValue());
+                }
+
+                @Override
+                public java.util.List<Setting<?>> getParentSettings() {
+                    return java.util.Collections.singletonList(BURN_IN_GUARD);
+                }
+            }
+    ).withRange(1, 10);
     public static final BooleanSetting HIDE_SHARE_GUIDE = new BooleanSetting("hide_share_guide", FALSE);
     public static final BooleanSetting HIDE_RAIL_FOLLOW = new BooleanSetting("hide_rail_follow", FALSE);
     public static final BooleanSetting HIDE_RAIL_LIKE = new BooleanSetting("hide_rail_like", FALSE);

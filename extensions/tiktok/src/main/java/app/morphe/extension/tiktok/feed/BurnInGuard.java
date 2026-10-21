@@ -97,6 +97,13 @@ public final class BurnInGuard {
         return DIM.equals(value) || DIM_AND_SHIFT.equals(value) ? value : OFF;
     }
 
+    /** How long the screen goes untouched before controls dim, in milliseconds. */
+    static long idleAfterMs() {
+        int seconds = Settings.BURN_IN_IDLE_TIMEOUT.get();
+        if (seconds < 1 || seconds > 10) seconds = 5;
+        return seconds * 1000L;
+    }
+
     /**
      * Runs with every overlay pass. Answers the level the fade draws the controls at this pass,
      * {@code chosen} unless the screen has gone untouched, moves the controls or puts them back, and
@@ -122,9 +129,10 @@ public final class BurnInGuard {
             fingerDown = false;
         }
         guarding = on;
+        long idleAfterMs = idleAfterMs();
         int targetIdleLevel = Math.max(0, Math.min(100, Settings.BURN_IN_IDLE_LEVEL.get()));
         boolean canDim = on && chosen > targetIdleLevel;
-        dimmed = canDim && !fingerDown && now - touchedAt >= IDLE_AFTER_MS;
+        dimmed = canDim && !fingerDown && now - touchedAt >= idleAfterMs;
         boolean shifting = on && DIM_AND_SHIFT.equals(mode);
         CONTROLS.clear();
         shiftingControls = shifting;
@@ -133,7 +141,7 @@ public final class BurnInGuard {
         shiftX = at[0] * step;
         shiftY = at[1] * step;
         // No dim is timed while a finger is down; its lift asks for the pass that times one.
-        schedule(Math.min(canDim && !dimmed && !fingerDown ? touchedAt + IDLE_AFTER_MS : Long.MAX_VALUE,
+        schedule(Math.min(canDim && !dimmed && !fingerDown ? touchedAt + idleAfterMs : Long.MAX_VALUE,
                 shifting ? (now / SHIFT_EVERY_MS + 1) * SHIFT_EVERY_MS : Long.MAX_VALUE));
         return dimmed ? targetIdleLevel : chosen;
     }
