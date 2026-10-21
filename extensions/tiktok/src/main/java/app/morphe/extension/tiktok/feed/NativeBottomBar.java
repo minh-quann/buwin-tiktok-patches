@@ -158,11 +158,11 @@ public final class NativeBottomBar {
 
     /** Runs before the native seek mask measures its children, not after a visible frame. */
     public static boolean measureFeed(View mask) {
-        prepareClearBar(mask);
+        View clearBar = prepareClearBar(mask);
         NativeSafeArea.measureDetailPage(mask);
         if (!(mask instanceof ViewGroup)) return false;
         View bar = tabs(mask);
-        if (bar == null || bar.getParent() != mask) return false;
+        if ((bar == null || bar.getParent() != mask) && clearBar == null) return false;
         int id = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "video_seek_bar", false);
         View seek = id == 0 ? null : mask.findViewById(id);
         if (seek == null || !(seek.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return false;
@@ -171,12 +171,25 @@ public final class NativeBottomBar {
         int base = held != null && params.bottomMargin == held[1] ? held[0] : params.bottomMargin;
         int seekHeight = params.height > 0 ? params.height : seek.getMeasuredHeight();
         int margin;
-        if (enabled() && held != null && HoldVideoViewport.isHolding(mask)) {
+        if (clearBar != null && clearBar.getVisibility() == View.VISIBLE && seek.getParent() == mask) {
+            // Clear-mode's original row is the painted boundary while tabs are GONE. It
+            // must also work on a fresh bind with no cached seek margins or gesture owner.
+            ViewGroup.LayoutParams rowParams = clearBar.getLayoutParams();
+            int rowHeight = rowParams != null && rowParams.height > 0
+                    ? rowParams.height : clearBar.getMeasuredHeight();
+            if (rowHeight <= 0) return false;
+            int rowBottom = rowParams instanceof ViewGroup.MarginLayoutParams
+                    ? ((ViewGroup.MarginLayoutParams) rowParams).bottomMargin : 0;
+            // Both bottom-anchored siblings already inherit the mask's bottom padding.
+            margin = rowHeight + rowBottom
+                    - Math.round(clearBar.getTranslationY()) - seekHeight / 2 + 1;
+            SEEK_MARGINS.put(seek, new int[]{base, margin, margin + seekHeight / 2, parentHeight(seek)});
+        } else if (enabled() && held != null && HoldVideoViewport.isHolding(mask)) {
             // Preserve the TRACK centre even if the native drag touch target changes height.
             margin = held[2] - seekHeight / 2 + parentHeight(seek) - held[3];
             held[1] = margin;
         } else {
-            if (!enabled() || bar.getVisibility() != View.VISIBLE) {
+            if (!enabled() || bar == null || bar.getVisibility() != View.VISIBLE) {
                 SEEK_MARGINS.remove(seek);
                 if (held == null || params.bottomMargin != held[1] || params.bottomMargin == base) return false;
                 params.bottomMargin = base;
@@ -196,19 +209,21 @@ public final class NativeBottomBar {
     }
 
     /** TikTok replaces its tabs with this original clear-mode row during pinch zoom. */
-    private static void prepareClearBar(View mask) {
+    private static View prepareClearBar(View mask) {
         int id = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "47.4.3:l6f", false);
         View row = id == 0 ? null : mask.findViewById(id);
-        if (row == null || row.getParent() != mask) return;
+        if (row == null || row.getParent() != mask) return null;
         if (enabled() && SeeThroughStatusBar.wantsNativeFill(mask)) {
             if (!CLEAR_BACKGROUNDS.containsKey(row)) CLEAR_BACKGROUNDS.put(row, row.getBackground());
             blackBackground(row);
+            return row;
         } else if (CLEAR_BACKGROUNDS.containsKey(row)) {
             Drawable before = CLEAR_BACKGROUNDS.remove(row);
             Drawable now = row.getBackground();
             if (now instanceof ColorDrawable && ((ColorDrawable) now).getColor() == Color.BLACK)
                 row.setBackground(before);
         }
+        return null;
     }
 
     private static int parentHeight(View view) {

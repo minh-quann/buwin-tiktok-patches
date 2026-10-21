@@ -6,6 +6,7 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
@@ -77,12 +78,24 @@ public class PinchBottomBarTest {
             FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(128, 128);
             buttonParams.leftMargin = 38; buttonParams.topMargin = 28; clear.addView(button, buttonParams);
             mask.addView(clear, new FrameLayout.LayoutParams(-1, 230, Gravity.BOTTOM));
+            View seek = new View(activity) {
+                final Paint paint = new Paint();
+                @Override protected void onDraw(Canvas canvas) {
+                    paint.setColor(Color.YELLOW);
+                    canvas.drawRect(39, getHeight() / 2 - 1, 1281, getHeight() / 2 + 1, paint);
+                }
+            };
+            seek.setId(0x7f0a9cc5);
+            FrameLayout.LayoutParams seekParams = new FrameLayout.LayoutParams(-1, 90, Gravity.BOTTOM);
+            seekParams.bottomMargin = 116; // actual native clear-mode bind from Honor ADB
+            mask.addView(seek, seekParams);
             clear.setVisibility(View.GONE); activity.setContentView(mask);
             layout(mask.getRootView()); layout(activity.findViewById(android.R.id.content));
             var field = NativeBottomBar.class.getDeclaredField("IDS"); field.setAccessible(true);
             ResourceIdCache ids = (ResourceIdCache) field.get(null);
             ids.putForTests(activity.getPackageName(), "47.4.3:l6f", clear.getId());
             ids.putForTests(activity.getPackageName(), "47.4.3:onp", tabs.getId());
+            ids.putForTests(activity.getPackageName(), "video_seek_bar", seek.getId());
             SeeThroughBottomBar.adjustBottomBarChin(tabs);
             var owner = new HoldVideoViewportTest.Edge(video);
             HoldVideoViewport.pinch(owner, true);
@@ -90,11 +103,13 @@ public class PinchBottomBarTest {
             RememberClearDisplayPatch.rememberClearDisplayEvent(new HoldVideoViewportTest.ClearEvent(true, 0));
             NativeBottomBar.measureFeed(mask); layout(mask);
             assertEquals(2638, clear.getTop()); assertEquals(230, clear.getHeight());
-            assertEquals(3, mask.getChildCount()); assertEquals(1.5f, video.getScaleY(), 0);
+            assertEquals(4, mask.getChildCount()); assertEquals(1.5f, video.getScaleY(), 0);
+            assertEquals(clear.getTop() - 1, seek.getTop() + seek.getHeight() / 2);
             // The native row may fade in; its transparent phase must not expose zoom overflow.
             clear.setAlpha(0f);
             Bitmap faded = render(mask);
-            assertEquals(Color.BLUE, faded.getPixel(660, 2637));
+            assertEquals(Color.BLUE, faded.getPixel(660, 2635));
+            assertEquals(Color.YELLOW, faded.getPixel(660, 2637));
             for (int y = 2638; y < 2868; y++) assertEquals("y=" + y, Color.BLACK, faded.getPixel(660, y));
             clear.setAlpha(1f); clear.setBackgroundColor(Color.TRANSPARENT);
             NativeBottomBar.prepareFrame(tabs); // native theme rebind without another measure
@@ -104,6 +119,13 @@ public class PinchBottomBarTest {
             assertEquals(Color.WHITE, shown.getPixel(102, 2730));
             assertTrue(clear.getTop() + button.getTop() >= 2638);
             assertTrue(clear.getTop() + button.getBottom() <= 2868);
+            // Rebinding/dragging changes the native touch target, but the TRACK stays at the edge.
+            for (int height : new int[]{160, 90, 160, 90}) {
+                seekParams.height = height; seekParams.bottomMargin = 116;
+                seek.requestLayout(); layout(mask);
+                NativeBottomBar.prepareFrame(tabs); layout(mask);
+                assertEquals(clear.getTop() - 1, seek.getTop() + seek.getHeight() / 2);
+            }
             HoldVideoViewport.pinch(owner, false);
             tabs.setVisibility(View.VISIBLE); clear.setVisibility(View.GONE);
             RememberClearDisplayPatch.rememberClearDisplayEvent(new HoldVideoViewportTest.ClearEvent(false, 2));
@@ -112,6 +134,14 @@ public class PinchBottomBarTest {
             Canvas canvas = new Canvas(Bitmap.createBitmap(1320, 2868, Bitmap.Config.ARGB_8888));
             HoldVideoViewport.clipCell(cell, canvas);
             assertEquals(new Rect(0, 0, 1320, 2868), canvas.getClipBounds());
+            // Clear display can also bind after the gesture has ended, without a hold cache.
+            tabs.setVisibility(View.GONE); clear.setVisibility(View.VISIBLE);
+            seekParams.bottomMargin = 116; seek.requestLayout(); layout(mask);
+            NativeBottomBar.measureFeed(mask); layout(mask);
+            assertEquals(clear.getTop() - 1, seek.getTop() + seek.getHeight() / 2);
+            mask.setPadding(0, 0, 0, 16); layout(mask);
+            NativeBottomBar.measureFeed(mask); layout(mask);
+            assertEquals(clear.getTop() - 1, seek.getTop() + seek.getHeight() / 2);
             SettingsStatus.videoOverlaysEnabled = false; NativeBottomBar.measureFeed(mask);
             assertNull(clear.getBackground());
             ids.clear();

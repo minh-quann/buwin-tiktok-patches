@@ -36,3 +36,5 @@ Video mở từ tin nhắn (DetailFeedQuickDMFragment) dùng composer kyn/udg, k
 Pinch hai ngón cũng ẩn chrome qua PinchComponent: chốt crop nền trước sự kiện clean UI, giữ tới khi layout trở lại như giữ x2. Màn video mở riêng phải chốt strip theo chiều cao composer sau onMeasure (kể cả divider), đồng bộ slot thanh tua vrd và giữ reserve sau các lần ScreenAdaptionComponent ghi đè; không chỉ thêm padding ô nhập.
 
 Khi pinch zoom, giữ nguyên vùng đen của bottom bar: giới hạn phần vẽ của cell native theo viewport đã chốt, không để texture phóng lớn vẽ vào hàng nút. Container thanh điều khiển clear-mode gốc l6f phải có nền đen trong vùng đó; giữ nguyên kích thước/vị trí nút và không thêm overlay ngoài component.
+
+Thanh tua phải neo sát mép trên vùng đen (tâm đường tua cách mép 1 px về phía video), kể cả khi tabs GONE và không còn cache hold/seek. Lấy chiều cao/margin của hàng clear-mode l6f đang hiện làm mốc trong measure/pre-draw; bù theo chiều cao touch target hiện tại, không giữ margin cũ khiến đường tua đè lên nút.
