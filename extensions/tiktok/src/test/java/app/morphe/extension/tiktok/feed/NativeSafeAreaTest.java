@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.Insets;
 import android.provider.Settings;
 import android.view.View;
+import android.view.Gravity;
 import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -107,5 +108,76 @@ public class NativeSafeAreaTest {
             assertEquals(158, strip.getLayoutParams().height);
             ids.clear();
         }
+    }
+
+    @Test public void profileFooterKeepsCaptionAndSeekAboveItsMeasuredDividerAndSafePadding() throws Exception {
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.detail.ui.DetailActivity.class).setup()) {
+            Activity activity = controller.get();
+            FrameLayout window = new FrameLayout(activity), cell = new FrameLayout(activity);
+            LinearLayout column = new LinearLayout(activity); column.setOrientation(LinearLayout.VERTICAL);
+            column.setId(0x7f0a9ea4);
+            View strip = new View(activity); strip.setId(0x7f0a0e95);
+            column.addView(cell, new LinearLayout.LayoutParams(-1, 0, 1));
+            column.addView(strip, new LinearLayout.LayoutParams(-1, 158));
+            window.addView(column, new FrameLayout.LayoutParams(-1, -1));
+            FrameLayout widgets = new FrameLayout(activity);
+            FrameLayout.LayoutParams widgetParams = new FrameLayout.LayoutParams(-1, -1); widgetParams.bottomMargin = -152;
+            cell.addView(widgets, widgetParams);
+            View caption = new View(activity);
+            FrameLayout.LayoutParams captionParams = new FrameLayout.LayoutParams(-1, 245, Gravity.BOTTOM);
+            captionParams.bottomMargin = 151; widgets.addView(caption, captionParams);
+            Root composer = new Root(activity); composer.setId(0x7f0a59aa);
+            LinearLayout footer = new LinearLayout(activity); footer.setOrientation(LinearLayout.VERTICAL); footer.setId(0x7f0a1b82);
+            footer.addView(new View(activity), new LinearLayout.LayoutParams(-1, 2));
+            View input = new View(activity); footer.addView(input, new LinearLayout.LayoutParams(-1, 158));
+            composer.addView(footer, new FrameLayout.LayoutParams(-1, -2));
+            window.addView(composer, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+            FrameLayout seekSlot = new FrameLayout(activity); seekSlot.setId(0x7f0a74c2);
+            View seek = new View(activity); seekSlot.addView(seek, new FrameLayout.LayoutParams(-1, 90));
+            window.addView(seekSlot, new FrameLayout.LayoutParams(-1, 206, Gravity.BOTTOM));
+            activity.setContentView(window);
+            var field = NativeSafeArea.class.getDeclaredField("IDS"); field.setAccessible(true);
+            ResourceIdCache ids = (ResourceIdCache) field.get(null);
+            String pkg = activity.getPackageName();
+            ids.putForTests(pkg, "47.4.3:qox", composer.getId());
+            ids.putForTests(pkg, "47.4.3:f2t", footer.getId());
+            ids.putForTests(pkg, "47.4.3:cnc", strip.getId());
+            ids.putForTests(pkg, "47.4.3:vrd", seekSlot.getId());
+            ids.putForTests(pkg, "viewpager_container", column.getId());
+            int chin = SeeThroughBottomBar.getChinHeight(activity);
+            NativeBottomBar.measureFeed(window);
+            measureWindow(window);
+            NativeSafeArea.finishDetailInput(composer);
+            measureWindow(window);
+            int expectedHeight = 160 + chin;
+            assertEquals(expectedHeight, composer.getHeight());
+            assertEquals(expectedHeight, strip.getLayoutParams().height);
+            assertEquals(composer.getTop(), cell.getBottom());
+            assertEquals(composer.getTop() + 1, widgets.getTop() + caption.getBottom());
+            assertEquals(composer.getTop() - 3, seekSlot.getTop() + seek.getHeight() / 2);
+            // Native screen adaption can overwrite its strip without remeasuring the input.
+            for (int i = 0; i < 4; i++) {
+                strip.getLayoutParams().height = 158;
+                NativeSafeArea.measureDetailPage(strip);
+                NativeSafeArea.measureDetailInput(composer);
+                NativeSafeArea.finishDetailInput(composer);
+                measureWindow(window);
+                assertEquals(expectedHeight, strip.getLayoutParams().height);
+                assertEquals(composer.getTop(), cell.getBottom());
+                assertEquals(composer.getTop() - 3, seekSlot.getTop() + seek.getHeight() / 2);
+            }
+            composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
+            NativeSafeArea.measureDetailPage(window);
+            assertEquals(158, strip.getLayoutParams().height);
+            assertEquals(0, ((FrameLayout.LayoutParams) seekSlot.getLayoutParams()).bottomMargin);
+            NativeSafeArea.releaseDetailInput(composer);
+            ids.clear();
+        }
+    }
+
+    private static void measureWindow(View window) {
+        window.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
+        window.layout(0, 0, 1320, 2868);
     }
 }

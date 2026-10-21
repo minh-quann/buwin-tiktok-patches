@@ -20,6 +20,11 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {30, 35}, manifest = Config.NONE)
 public class HoldVideoViewportTest {
+    public static final class ClearEvent {
+        public final boolean LIZ;
+        public final int LIZIZ;
+        ClearEvent(boolean clear, int type) { LIZ = clear; LIZIZ = type; }
+    }
     public static final class Edge {
         final View view;
         Edge(View view) { this.view = view; }
@@ -38,13 +43,21 @@ public class HoldVideoViewportTest {
     }
 
     @Test public void nativeHoldKeepsCropThroughHiddenTabsAndClearModeUntilReleaseLayoutSettles() {
+        checkGesture(false);
+    }
+
+    @Test public void nativePinchKeepsTheFilledBaseCropWhenCleanUiHidesTabs() {
+        checkGesture(true);
+    }
+
+    private void checkGesture(boolean pinch) {
         try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
             Activity activity = controller.get();
             Utils.setContext(activity);
             SettingsStatus.videoOverlaysEnabled = true;
             Settings.FIT_VIDEO_TO_SCREEN.save(false);
             Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SCALE);
-            RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(false, 2));
+            RememberClearDisplayPatch.rememberClearDisplayEvent(new ClearEvent(false, 2));
             FrameLayout root = new FrameLayout(activity), cell = new FrameLayout(activity);
             View player = new View(activity), gesture = new View(activity), bar = new View(activity);
             cell.addView(player, new FrameLayout.LayoutParams(720, 1280));
@@ -59,27 +72,29 @@ public class HoldVideoViewportTest {
             Result before = (Result) VideoFit.fitted(player, source);
             Edge owner = new Edge(gesture);
             for (int i = 0; i < 5; i++) {
-                HoldVideoViewport.begin(owner);
+                if (pinch) HoldVideoViewport.pinch(owner, true);
+                else HoldVideoViewport.begin(owner);
                 bar.setVisibility(View.GONE);
-                RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(true, 0));
+                RememberClearDisplayPatch.rememberClearDisplayEvent(new ClearEvent(true, 0));
                 layout(content);
                 same(before, (Result) VideoFit.fitted(player, source));
-                HoldVideoViewport.end(owner);
+                if (pinch) HoldVideoViewport.pinch(owner, false);
+                else HoldVideoViewport.end(owner);
                 // Release arrives before the host restores tabs: do not expand for that frame.
                 same(before, (Result) VideoFit.fitted(player, source));
                 bar.setVisibility(View.VISIBLE);
-                RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(false, 2));
+                RememberClearDisplayPatch.rememberClearDisplayEvent(new ClearEvent(false, 2));
                 layout(content);
                 same(before, (Result) VideoFit.fitted(player, source));
             }
             // A deliberate Clear display outside the gesture still gets its own full viewport.
-            RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(true, 0));
+            RememberClearDisplayPatch.rememberClearDisplayEvent(new ClearEvent(true, 0));
             Result clear = (Result) VideoFit.fitted(player, source);
             assertTrue(clear.getHeight() > before.getHeight());
             assertEquals(1f, player.getScaleX(), 0f);
             assertEquals(1f, player.getScaleY(), 0f);
         } finally {
-            RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(false, 2));
+            RememberClearDisplayPatch.rememberClearDisplayEvent(new ClearEvent(false, 2));
             SettingsStatus.videoOverlaysEnabled = false;
         }
     }

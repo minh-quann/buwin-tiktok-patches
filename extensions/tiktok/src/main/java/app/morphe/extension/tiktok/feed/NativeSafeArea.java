@@ -11,6 +11,7 @@ import java.util.WeakHashMap;
 
 import app.morphe.extension.shared.ResourceIdCache;
 import app.morphe.extension.shared.settings.BuwinPause;
+import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
 import app.morphe.extension.tiktok.settings.SettingsStatus;
 
 /** Shared bottom-safe-area policy consumed by the original keyboard and sheet components. */
@@ -19,6 +20,7 @@ public final class NativeSafeArea {
     private static final Map<View, int[]> PADDING = new WeakHashMap<>();
     private static final Map<View, int[]> HEIGHTS = new WeakHashMap<>();
     private static final Map<View, java.lang.ref.WeakReference<View>> STRIP_OWNERS = new WeakHashMap<>();
+    private static final Map<View, int[]> SEEK_MARGINS = new WeakHashMap<>();
     private NativeSafeArea() { }
 
     public static int minimumBottom(View view) {
@@ -73,6 +75,24 @@ public final class NativeSafeArea {
 
     /** The opened-video composer and its original pager spacer share the added height. */
     public static void measureDetailInput(View root) {
+        syncDetailInput(root, false);
+    }
+
+    /** Complete the reserve from the actual native measurement, including its divider/padding. */
+    public static void finishDetailInput(View root) {
+        syncDetailInput(root, true);
+    }
+
+    /** Called by the native seek mask and after the screen-adaption component writes its strip. */
+    public static void measureDetailPage(View page) {
+        if (page == null || !FeedVisibility.isDetailPager(SeeThroughStatusBar.activityOf(page))) return;
+        View window = page.getRootView();
+        View composer = child(window, "47.4.3:qox");
+        if (composer == null || !composer.isShown()) composer = child(window, "47.4.3:udk");
+        if (composer != null && composer.isShown()) measureDetailInput(composer);
+    }
+
+    private static void syncDetailInput(View root, boolean measured) {
         View footer = child(root, "47.4.3:f2t");
         // DetailFeedQuickDMFragment reuses the same native keyboard root, but its real
         // input row is udg (there is no f2t child in that layout).
@@ -103,20 +123,47 @@ public final class NativeSafeArea {
             if (params == null || params.height < 0) continue;
             int[] held = HEIGHTS.get(strip);
             int base = held != null && params.height == held[1] ? held[0] : params.height;
-            int height = base + (root.getVisibility() == View.VISIBLE ? added : 0);
-            HEIGHTS.put(strip, new int[]{base, height});
+            int extra = root.getVisibility() == View.VISIBLE ? added : 0;
+            int height = base + extra;
+            if (extra > 0) {
+                // Keep the last measured divider/root padding during the next measure's entry.
+                if (!measured && held != null && held.length > 2 && held[2] == extra)
+                    height += Math.max(0, held[1] - held[0] - extra);
+                if (measured) height = Math.max(height, root.getMeasuredHeight());
+            }
+            HEIGHTS.put(strip, new int[]{base, height, extra});
             STRIP_OWNERS.put(strip, new java.lang.ref.WeakReference<>(root));
             if (params.height != height) {
                 params.height = height;
                 strip.setLayoutParams(params);
             }
+            moveDetailSeek(window, strip.getVisibility() == View.GONE ? 0 : height - base);
+        }
+    }
+
+    /** The detail seek slot is a sibling of the pager/composer, so it needs the same reserve. */
+    private static void moveDetailSeek(View window, int extra) {
+        View slot = child(window, "47.4.3:vrd");
+        if (slot == null || !(slot.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)
+                || HoldVideoViewport.isHolding(slot)) return;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) slot.getLayoutParams();
+        int[] held = SEEK_MARGINS.get(slot);
+        int top = held != null && params.topMargin == held[0] - held[2] ? held[0] : params.topMargin;
+        int bottom = held != null && params.bottomMargin == held[1] + held[2] ? held[1] : params.bottomMargin;
+        SEEK_MARGINS.put(slot, new int[]{top, bottom, extra});
+        if (params.topMargin != top - extra || params.bottomMargin != bottom + extra) {
+            params.topMargin = top - extra;
+            params.bottomMargin = bottom + extra;
+            slot.setLayoutParams(params);
         }
     }
 
     public static void releaseDetailInput(View root) {
+        boolean released = false;
         for (View strip : new java.util.ArrayList<>(STRIP_OWNERS.keySet())) {
             java.lang.ref.WeakReference<View> owner = STRIP_OWNERS.get(strip);
             if (owner == null || owner.get() != root) continue;
+            released = true;
             int[] held = HEIGHTS.remove(strip);
             STRIP_OWNERS.remove(strip);
             ViewGroup.LayoutParams params = strip.getLayoutParams();
@@ -125,6 +172,7 @@ public final class NativeSafeArea {
                 strip.setLayoutParams(params);
             }
         }
+        if (released) moveDetailSeek(root.getRootView(), 0);
     }
 
     /** Returns only the space we added. Existing native safe padding is never added twice. */

@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import app.morphe.extension.tiktok.blockauthor.Reflect;
 
-/** Keeps native edge-speedup's temporary chrome hiding out of the video crop calculation. */
+/** Keeps gesture-driven chrome hiding out of the video's base crop calculation. */
 public final class HoldVideoViewport {
     private static final Map<View, int[]> LAST = new WeakHashMap<>();
     private static final Map<View, int[]> GUIDE_MARGINS = new WeakHashMap<>();
@@ -66,6 +66,12 @@ public final class HoldVideoViewport {
         for (Hold hold : HOLDS.values()) {
             if (hold.owner.get() == owner) hold.released = true;
         }
+    }
+
+    /** PinchComponent calls this before its clean-UI event resizes the native pager. */
+    public static void pinch(Object owner, boolean clearing) {
+        if (clearing) begin(owner);
+        else end(owner);
     }
 
     /** Scene identity survives the native hold temporarily hiding its DM composer. */

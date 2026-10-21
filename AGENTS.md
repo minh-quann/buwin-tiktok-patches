@@ -32,3 +32,5 @@ Nhấn giữ cạnh để tăng tốc chỉ được đổi tốc độ và chro
 Chủ repo dùng Morphe để build APK: chỉ build extension/patch DEX, cập nhật cache và push; không xuất APK riêng trừ khi được yêu cầu. Khi giữ x2 phải chốt cả native margins của widget/caption và tâm đường tua; giữ vị trí qua việc ẩn bar, đổi chiều cao touch target và reflow parent, không chỉ chốt khung video.
 
 Video mở từ tin nhắn (DetailFeedQuickDMFragment) dùng composer kyn/udg, khác footer f2t. Giữ native safe area cho cả hai và đồng bộ strip cnc của pager; fill video của màn có composer DM lên status bar nhưng giữ header/profile ngoài màn này. Thanh hướng dẫn giữ x2 lệch xuống tổng cộng 12 px, không cộng dồn.
+
+Pinch hai ngón cũng ẩn chrome qua PinchComponent: chốt crop nền trước sự kiện clean UI, giữ tới khi layout trở lại như giữ x2. Màn video mở riêng phải chốt strip theo chiều cao composer sau onMeasure (kể cả divider), đồng bộ slot thanh tua vrd và giữ reserve sau các lần ScreenAdaptionComponent ghi đè; không chỉ thêm padding ô nhập.

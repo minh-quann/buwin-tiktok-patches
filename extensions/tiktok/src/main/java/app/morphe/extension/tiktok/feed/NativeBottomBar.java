@@ -157,6 +157,7 @@ public final class NativeBottomBar {
 
     /** Runs before the native seek mask measures its children, not after a visible frame. */
     public static boolean measureFeed(View mask) {
+        NativeSafeArea.measureDetailPage(mask);
         if (!(mask instanceof ViewGroup)) return false;
         View bar = tabs(mask);
         if (bar == null || bar.getParent() != mask) return false;

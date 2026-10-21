@@ -139,6 +139,26 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         check(view.methods.none { it.name == "onApplyWindowInsets" })
     }
     check(classDefBy("LX/1QL4;").methods.none { it.name == "onDetachedFromWindow" })
+    // ScreenAdaptionComponent rewrites the native pager strip after the input measured.
+    // Resolve that original strip field from its resource, then reconcile after both writers.
+    val screenType = "Lcom/ss/android/ugc/feed/platform/panel/adaption/ScreenAdaptionComponent;"
+    val screen = classDefBy(screenType)
+    val screenBind = screen.methods.single { it.name == "LLLZLZ" }.implementation!!.instructions.toList()
+    val stripResource = screenBind.indexOfFirst { (it as? NarrowLiteralInstruction)?.narrowLiteral == 0x7f0a0e95 }
+    check(stripResource >= 0)
+    val stripField = screenBind.drop(stripResource + 1).take(8).first { it.opcode == Opcode.IPUT_OBJECT }
+        .getReference<FieldReference>()!!
+    check(stripField.definingClass == screenType && stripField.type == "Landroid/view/View;")
+    val screenWriters = listOf(listOf("I"), listOf("Lcom/ss/android/ugc/aweme/screenadaption/adaptionparams/ScreenAdaptionResult;"))
+        .map { types ->
+            screen.methods.single { method -> method.parameterTypes == types && method.returnType == "V" &&
+                method.implementation?.instructions?.any {
+                    it.opcode == Opcode.IGET_OBJECT && it.getReference<FieldReference>()?.toString() == stripField.toString()
+                } == true && method.implementation!!.instructions.any {
+                    it.opcode == Opcode.IPUT && it.getReference<FieldReference>()?.name == "height"
+                }
+            }
+        }
     val sheetType = "Lcom/google/android/material/bottomsheet/BottomSheetBehavior;"
     val sheetLayout = classDefBy(sheetType).methods.single {
         it.name == "onLayoutChild" && it.parameterTypes.size == 3
@@ -199,7 +219,30 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         invoke-super { p0, p1, p2 }, Landroid/widget/LinearLayout;->onMeasure(II)V
         return-void
     """)
+    // Pinch uses the same temporary clean UI through a different native component. Capture
+    // BEFORE IFeedCleanAbility/VideoViewCell hide chrome, not from a later layout callback.
+    val pinchType = "Lcom/ss/android/ugc/feed/platform/cell/pinch/PinchComponent;"
+    val pinch = classDefBy(pinchType).methods.single { method ->
+        method.parameterTypes == listOf("J", "Z", "Z") && method.returnType == "V" &&
+            method.implementation?.instructions?.any {
+                it.getReference<StringReference>()?.string == "pinch"
+            } == true
+    }
+    check(pinch.implementation!!.registerCount <= 16) { "Native pinch: review parameter register range" }
     return {
+        screenWriters.forEach { writer ->
+            mutableClassDefBy(screenType).methods.single { it.name == writer.name && it.parameterTypes == writer.parameterTypes }.apply {
+                implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }
+                    .reversed().forEach { index -> addInstructions(index, """
+                        move-object/from16 v0, p0
+                        iget-object v0, v0, $stripField
+                        invoke-static { v0 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->measureDetailPage(Landroid/view/View;)V
+                    """) }
+            }
+        }
+        mutableClassDefBy(pinchType).methods.single { it.name == pinch.name && it.parameterTypes == pinch.parameterTypes }
+            .addInstructions(0,
+                "invoke-static { p0, p3 }, Lapp/morphe/extension/tiktok/feed/HoldVideoViewport;->pinch(Ljava/lang/Object;Z)V")
         mutableClassDefBy(guideType).methods.add(guideMeasure)
         holdHooks.forEach { (name, index, hook) ->
             mutableClassDefBy(edgeType).methods.single { it.name == name }.addInstructions(index,
@@ -214,7 +257,14 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
             val parentType = checkNotNull(view.superclass)
             val call = "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->$hook(Landroid/view/View;)V"
             val existing = view.methods.singleOrNull { it.name == "onMeasure" && it.parameterTypes == listOf("I", "I") }
-            if (existing != null) existing.addInstructions(0, call)
+            if (existing != null) {
+                if (hook == "measureDetailInput") {
+                    existing.implementation!!.instructions.toList().indices.filter { existing.getInstruction(it).opcode == Opcode.RETURN_VOID }
+                        .reversed().forEach { existing.addInstructions(it,
+                            "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->finishDetailInput(Landroid/view/View;)V") }
+                }
+                existing.addInstructions(0, call)
+            }
             else view.methods.add(nativeOverride(type, "onMeasure", listOf("I", "I"), 3, """
                 $call
                 invoke-super { p0, p1, p2 }, $parentType->onMeasure(II)V
