@@ -7,6 +7,9 @@ package app.morphe.patches.tiktok.interaction.videooverlays
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.util.addInstructions
+import app.morphe.util.addInstructionsWithLabels
+import app.morphe.patcher.util.smali.ExternalLabel
+import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.util.getReference
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
@@ -98,10 +101,47 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         move-result v0
         return v0
     """, "Z", AccessFlags.PUBLIC.value)
+    val cell = "Lcom/ss/android/ugc/aweme/feed/VideoViewCellRootView;"
+    val mask = "Lcom/ss/android/ugc/aweme/feed/ui/seekbar/VideoSeekBarMaskView;"
+    val measureHooks = listOf(cell to "measureCell", mask to "measureFeed").map { (type, hook) ->
+        val definition = classDefBy(type)
+        check(definition.methods.none { it.name == "onMeasure" }) {
+            "Native feed geometry: $type now owns onMeasure; review before patching"
+        }
+        type to nativeOverride(type, "onMeasure", listOf("I", "I"), 3, """
+            invoke-static { p0 }, $NATIVE_BOTTOM_BAR->$hook(Landroid/view/View;)${if (hook == "measureFeed") "Z" else "V"}
+            invoke-super { p0, p1, p2 }, ${definition.superclass}->onMeasure(II)V
+            return-void
+        """)
+    }
+    // Set the crop policy where TikTok calculates its FIRST result, before the rendering
+    // surface is sized. Prevent the smart/multi-container strategies from replacing it later.
+    val operator = "Lcom/ss/android/ugc/feed/platform/cell/component/adaption/FeedVideoAdaptionParamsOperator;"
+    val definition = classDefBy(operator)
+    val scale = definition.methods.single { it.name == "getForceScaleType" && it.parameterTypes.isEmpty() }
+    val scaleType = scale.returnType
+    check(classDefBy(scaleType).fields.any { it.name == "CROP" && it.type == scaleType })
+    check(definition.fields.any { it.name == "eventType" && it.type == "Ljava/lang/String;" })
+    val policyHooks = listOf("getForceScaleType", "getContainerAvoidTopBar", "getEnableMultiContainer", "getEnableSmartCrop")
+    policyHooks.forEach { name ->
+        val method = definition.methods.single { it.name == name && it.parameterTypes.isEmpty() }
+        check(method.implementation!!.registerCount >= 2) { "Native crop: $name has no local register" }
+    }
     return {
         val mutable = mutableClassDefBy(owner)
         mutable.interfaces.add(listener)
         listOf(measure, draw, insets, attach, detach, preDraw).forEach { mutable.methods.add(it) }
+        measureHooks.forEach { (type, method) -> mutableClassDefBy(type).methods.add(method) }
+        policyHooks.forEach { name ->
+            val method = mutableClassDefBy(operator).methods.single { it.name == name && it.parameterTypes.isEmpty() }
+            method.addInstructionsWithLabels(0, """
+                iget-object v0, p0, $operator->eventType:Ljava/lang/String;
+                invoke-static { v0 }, Lapp/morphe/extension/tiktok/interaction/StatusBarVideoFill;->useNativeCrop(Ljava/lang/String;)Z
+                move-result v0
+                if-eqz v0, :native_crop_original
+                ${if (name == "getForceScaleType") "sget-object v0, $scaleType->CROP:$scaleType\nreturn-object v0" else "const/4 v0, 0x0\nreturn v0"}
+            """, ExternalLabel("native_crop_original", method.getInstruction(0)))
+        }
     }
 }
 

@@ -166,11 +166,25 @@ final class SeeThroughBottomBar {
         View bar = bottomBarRef.get();
         if (cell == null || bar == null || bar.getRootView() != cell.getRootView()
                 || bar.getHeight() <= 0 || !bar.isShown()) return fullHeight;
-        int top = Math.round(topInWindow(bar) - topInWindow(cell));
+        // A feed cell moves by a whole page during a swipe. Its screen Y must NEVER enter
+        // the crop calculation: preloaded cells need exactly the same viewport as the visible one.
+        View viewport = null;
+        for (android.view.ViewParent p = cell.getParent(); p instanceof View; p = p.getParent()) {
+            View candidate = (View) p;
+            try {
+                if ("viewpager_container".equals(candidate.getResources().getResourceEntryName(candidate.getId()))) {
+                    viewport = candidate;
+                    break;
+                }
+            } catch (Exception ignored) { }
+            if (candidate == bar.getParent()) { viewport = candidate; break; }
+        }
+        if (viewport == null && bar.getParent() instanceof View) viewport = (View) bar.getParent();
+        int top = Math.round(topInWindow(bar) - (viewport == null ? 0 : topInWindow(viewport)));
         return top > 0 && top < fullHeight ? top : fullHeight;
     }
 
-    /** Keeps the native tab geometry; the Activity content root owns the bottom reserve. */
+    /** Keeps the native component as the common boundary for controls and video. */
     static void adjustBottomBarChin(View bar) {
         if (bar == null) return;
         bottomBarRef = new java.lang.ref.WeakReference<>(bar);

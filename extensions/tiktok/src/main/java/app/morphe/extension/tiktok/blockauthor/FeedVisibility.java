@@ -175,7 +175,11 @@ public final class FeedVisibility {
     public static boolean isFeedWindow(Activity activity) {
         if (activity == null) return false;
         String name = activity.getClass().getName();
-        return MAIN_ACTIVITY.equals(name) || DETAIL_PAGER.equals(name);
+        for (Class<?> type = activity.getClass(); type != null; type = type.getSuperclass()) {
+            if (MAIN_ACTIVITY.equals(type.getName())) return true;
+        }
+        // 47.4.3 also hosts its real feed under the launcher Activity (Honor ADB hierarchy).
+        return "com.ss.android.ugc.aweme.splash.SplashActivity".equals(name) || DETAIL_PAGER.equals(name);
     }
 
     public static boolean isDetailPager(Object activity) {

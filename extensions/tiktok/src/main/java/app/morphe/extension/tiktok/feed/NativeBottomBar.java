@@ -24,6 +24,8 @@ public final class NativeBottomBar {
     private static final Map<View, Integer> BASE_PADDING = new WeakHashMap<>();
     private static final ResourceIdCache IDS = new ResourceIdCache();
     private static final Map<View, WeakReference<View>> DIVIDERS = new WeakHashMap<>();
+    private static final Map<View, int[]> MARGINS = new WeakHashMap<>();
+    private static final Map<View, int[]> SEEK_MARGINS = new WeakHashMap<>();
     private NativeBottomBar() {}
 
     private static boolean enabled() {
@@ -77,9 +79,89 @@ public final class NativeBottomBar {
 
     /** Registered by the native component itself, so host rebinds cannot flash the separator. */
     public static boolean prepareFrame(View bar) {
-        if (!enabled() || !bar.isShown()) return true;
+        boolean active = enabled() && bar.isShown();
+        boolean changed = false;
+        // Sibling cells can reuse their measure cache when only the tab bar changes. Restore
+        // or reapply their owned margins before this frame, including a navigation-mode change.
+        for (View widgets : new java.util.ArrayList<>(MARGINS.keySet())) {
+            if (widgets.getRootView() == bar.getRootView()) changed |= moveMargins(widgets, active ? reserve(bar) : 0);
+        }
+        if (!active) {
+            if (bar.getParent() instanceof View) changed |= measureFeed((View) bar.getParent());
+            return !changed;
+        }
         blackBackground(bar);
-        return !removeDivider(bar);
+        changed |= removeDivider(bar);
+        if (bar.getParent() instanceof View) changed |= measureFeed((View) bar.getParent());
+        return !changed;
+    }
+
+    private static View tabs(View view) {
+        int id = IDS.resolve(view.getResources(), view.getContext().getPackageName(), "47.4.3:onp", false);
+        return id == 0 ? null : view.getRootView().findViewById(id);
+    }
+
+    private static int reserve(View bar) {
+        return enabled() && bar != null && bar.getVisibility() == View.VISIBLE
+                && !SeeThroughBottomBar.isSystemIndicatorActive(bar)
+                ? SeeThroughBottomBar.getChinHeight(bar.getContext()) : 0;
+    }
+
+    /** Runs in the original feed cell's onMeasure, including cells preloaded off screen. */
+    public static void measureCell(View cell) {
+        int id = IDS.resolve(cell.getResources(), cell.getContext().getPackageName(), "widget_container", false);
+        if (id == 0) return;
+        View widgets = cell.findViewById(id);
+        if (widgets != null) moveMargins(widgets, reserve(tabs(cell)));
+    }
+
+    /** Move the native widget layout without changing its measured size or adding an overlay. */
+    private static boolean moveMargins(View view, int lift) {
+        if (!(view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return false;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+        int[] held = MARGINS.get(view);
+        // A host rebind can replace either margin. Adopt its new base rather than adding twice.
+        int top = held != null && params.topMargin == held[0] - held[2] ? held[0] : params.topMargin;
+        int bottom = held != null && params.bottomMargin == held[1] + held[2] ? held[1] : params.bottomMargin;
+        MARGINS.put(view, new int[]{top, bottom, lift});
+        if (params.topMargin != top - lift || params.bottomMargin != bottom + lift) {
+            params.topMargin = top - lift;
+            params.bottomMargin = bottom + lift;
+            view.setLayoutParams(params);
+            return true;
+        }
+        return false;
+    }
+
+    /** Runs before the native seek mask measures its children, not after a visible frame. */
+    public static boolean measureFeed(View mask) {
+        if (!(mask instanceof ViewGroup)) return false;
+        View bar = tabs(mask);
+        if (bar == null || bar.getParent() != mask) return false;
+        int id = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "video_seek_bar", false);
+        View seek = id == 0 ? null : mask.findViewById(id);
+        if (seek == null || !(seek.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return false;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) seek.getLayoutParams();
+        int[] held = SEEK_MARGINS.get(seek);
+        int base = held != null && params.bottomMargin == held[1] ? held[0] : params.bottomMargin;
+        if (!enabled() || bar.getVisibility() != View.VISIBLE) {
+            SEEK_MARGINS.remove(seek);
+            if (held == null || params.bottomMargin != held[1] || params.bottomMargin == base) return false;
+            params.bottomMargin = base;
+            seek.setLayoutParams(params);
+            return true;
+        }
+        int row = bar.getLayoutParams().height;
+        if (row <= 0) return false;
+        int seekHeight = params.height > 0 ? params.height : seek.getMeasuredHeight();
+        // The seek track is at the centre of its native touch target. Keep it one pixel above
+        // the bar's actual top, even when TikTok changes the target from 18dp to 28dp.
+        int margin = row + reserve(bar) - seekHeight / 2 + 1;
+        SEEK_MARGINS.put(seek, new int[]{base, margin});
+        if (params.bottomMargin == margin) return false;
+        params.bottomMargin = margin;
+        seek.setLayoutParams(params);
+        return true;
     }
 
     private static boolean removeDivider(View bar) {

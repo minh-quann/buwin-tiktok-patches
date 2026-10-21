@@ -17,6 +17,9 @@ import java.util.WeakHashMap;
 
 import app.morphe.extension.tiktok.blockauthor.Reflect;
 import app.morphe.extension.tiktok.feed.SeeThroughStatusBar;
+import app.morphe.extension.tiktok.settings.Settings;
+import app.morphe.extension.tiktok.settings.SettingsStatus;
+import app.morphe.extension.shared.settings.BuwinPause;
 
 /**
  * Fills the feed's status-bar viewport through TikTok's native adaption result. Both the
@@ -26,6 +29,16 @@ import app.morphe.extension.tiktok.feed.SeeThroughStatusBar;
 public final class StatusBarVideoFill {
     private static final Map<View, Bound> BOUND = new WeakHashMap<>();
     private StatusBarVideoFill() {}
+
+    /** Native feed adaption policy, before any surface receives its initial dimensions. */
+    public static boolean useNativeCrop(String event) {
+        if (!SettingsStatus.videoOverlaysEnabled || BuwinPause.isPaused()
+                || Settings.FIT_VIDEO_TO_SCREEN.get()
+                || !Settings.STATUS_BAR_STYLE_SCALE.equals(Settings.STATUS_BAR_STYLE.get())) return false;
+        return "homepage_hot".equals(event) || "homepage_follow".equals(event)
+                || "homepage_friends".equals(event) || "homepage_nearby".equals(event)
+                || "homepage_fresh".equals(event) || "homepage_popular".equals(event);
+    }
 
     /** Null means this isn't the main feed's scale mode, or the result cannot be copied. */
     static Object fitted(View video, Object original) {

@@ -199,4 +199,48 @@ public class NativeBottomBarTest {
         }
     }
 
+    @Test public void honorNativeControlsAndSeekTrackUseTheSameBottomBoundary() throws Exception {
+        // Geometry read from the Honor's real 47.4.3 hierarchy, rather than a generic screen.
+        try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
+            FrameLayout mask = new FrameLayout(controller.get());
+            controller.get().setContentView(mask);
+            FrameLayout cell = new FrameLayout(mask.getContext());
+            mask.addView(cell, new FrameLayout.LayoutParams(1320, 2710));
+            View widgets = new View(mask.getContext());
+            widgets.setId(0x7f0aa089);
+            FrameLayout.LayoutParams widgetParams = new FrameLayout.LayoutParams(1320, 2862, Gravity.BOTTOM);
+            widgetParams.bottomMargin = -152;
+            cell.addView(widgets, widgetParams);
+            Tabs bar = tabs(mask);
+            bar.setId(0x7f0a4ecc);
+            bar.getLayoutParams().height = 158;
+            View seek = new View(mask.getContext());
+            seek.setId(0x7f0a9cc5);
+            mask.addView(seek, new FrameLayout.LayoutParams(1320, 90, Gravity.BOTTOM));
+            String pkg = mask.getContext().getPackageName();
+            cache().putForTests(pkg, "47.4.3:onp", bar.getId());
+            cache().putForTests(pkg, "widget_container", widgets.getId());
+            cache().putForTests(pkg, "video_seek_bar", seek.getId());
+            int chin = SeeThroughBottomBar.getChinHeight(mask.getContext());
+            for (int i = 0; i < 3; i++) {
+                NativeBottomBar.measureCell(cell);
+                NativeBottomBar.measureFeed(mask);
+                mask.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
+                mask.layout(0, 0, 1320, 2868);
+                assertEquals(-chin, widgets.getTop());
+                assertEquals(bar.getTop() - 1, seek.getTop() + seek.getHeight() / 2);
+                // Next/preloaded page is a whole screen lower. Crop height must remain identical.
+                assertEquals(bar.getTop(), SeeThroughBottomBar.getBottomBarTop(cell, 2710));
+                cell.setTranslationY(2710);
+                assertEquals(bar.getTop(), SeeThroughBottomBar.getBottomBarTop(cell, 2710));
+                cell.setTranslationY(0);
+            }
+            bar.setVisibility(View.GONE);
+            NativeBottomBar.measureCell(cell);
+            assertEquals(0, widgetParams.topMargin);
+            assertEquals(-152, widgetParams.bottomMargin);
+        }
+    }
+
 }

@@ -1399,8 +1399,8 @@ public final class VideoOverlayHider {
 
     /**
      * Keeps the caption and the buttons where TikTok had them once See-through bottom bar gives
-     * the main feed's pager the strip's room (#145). Bottom safe space is already
-     * accounted for by the content root's measured bounds.
+     * the main feed's pager the strip's room (#145). The native cell's measured margins
+     * separately reserve the extra space owned by its bottom-tabs component.
      */
     private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar, int layerId, int cellId) {
         List<View> lifted = new ArrayList<>();

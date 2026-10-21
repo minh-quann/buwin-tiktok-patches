@@ -18,3 +18,5 @@ Nếu repo có `.codegraph/`, dùng CodeGraph trước khi tìm/đọc code. Kh�
 Giữ video và giao diện tràn lên status bar như iOS theo yêu cầu của chủ repo. Khi sửa giật lúc lướt, sửa thời điểm tính/áp dụng kích thước; không tắt fill hoặc thu video xuống dưới status bar để né lỗi.
 
 Khoảng kê/nền đen ở đáy phải thuộc component bottom tabs gốc; không dành khoảng bằng padding/background của Activity và không thêm overlay. Khi sửa hook Kotlin, phải cập nhật cả JVM classes và patch DEX trong MPP cùng với extension; `scripts/build-local-native-bottom-bar.py` hỗ trợ cache local khi registry Gradle chưa khả dụng.
+
+Khi tăng chiều cao bottom tabs, phải nâng đồng bộ widget native (caption, cột nút, đĩa nhạc) và thanh tua trong bước measure/layout; không chỉ nâng riêng bar. Tính viewport video theo khung pager cố định, tuyệt đối không lấy tọa độ màn hình của cell đang cuộn hoặc cell được preload. Scale/crop phải được quyết định từ adaption policy gốc trước frame đầu, giữ fill lên status bar.
