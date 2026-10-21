@@ -29,6 +29,24 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
 public class ProfileTopBarTest {
+    @Test public void profileHeaderKeepsItsNativeStatusBarOffset() {
+        FrameLayout root = new FrameLayout(context);
+        FrameLayout header = new FrameLayout(context);
+        FrameLayout nav = new FrameLayout(context);
+        LinearLayout row = new LinearLayout(context);
+        row.setId(ROW_ID);
+        nav.addView(row);
+        header.addView(nav);
+        root.addView(header);
+        root.layout(0, 0, 1320, 2868);
+        header.layout(0, 144, 1320, 800);
+        nav.layout(0, 0, 1320, 167);
+        row.layout(0, 0, 1320, 167);
+        ProfileTopBar.apply(root);
+        assertEquals(144, header.getTop());
+        assertEquals(0f, header.getTranslationY(), 0f);
+        assertEquals(656, header.getHeight());
+    }
     private static final int ROW_ID = 0x7f0a0f61;
     private static final int CAPSULE_ID = 0x7f0a0f62;
 

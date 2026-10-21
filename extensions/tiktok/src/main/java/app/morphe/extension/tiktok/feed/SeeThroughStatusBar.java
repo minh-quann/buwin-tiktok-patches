@@ -104,6 +104,12 @@ public final class SeeThroughStatusBar {
     static void apply(Activity activity, boolean wanted) {
         Window window = activity.getWindow();
         if (window == null) return;
+        if (!wanted) {
+            Integer before = CLEARED.remove(window);
+            if (before != null && window.getStatusBarColor() == Color.TRANSPARENT) window.setStatusBarColor(before);
+            updateGradientScrim(activity, false);
+            return;
+        }
         int color = window.getStatusBarColor();
         String style = Settings.STATUS_BAR_STYLE.get();
         boolean isGradient = Settings.STATUS_BAR_STYLE_GRADIENT.equals(style);
@@ -113,8 +119,6 @@ public final class SeeThroughStatusBar {
                 CLEARED.put(window, color);
             }
             window.setStatusBarColor(Color.TRANSPARENT);
-        } else {
-            CLEARED.put(window, Color.TRANSPARENT);
         }
 
         if (Build.VERSION.SDK_INT >= 28) {

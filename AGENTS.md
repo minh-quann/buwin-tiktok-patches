@@ -20,3 +20,5 @@ Giữ video và giao diện tràn lên status bar như iOS theo yêu cầu của
 Khoảng kê/nền đen ở đáy phải thuộc component bottom tabs gốc; không dành khoảng bằng padding/background của Activity và không thêm overlay. Khi sửa hook Kotlin, phải cập nhật cả JVM classes và patch DEX trong MPP cùng với extension; `scripts/build-local-native-bottom-bar.py` hỗ trợ cache local khi registry Gradle chưa khả dụng.
 
 Khi tăng chiều cao bottom tabs, phải nâng đồng bộ widget native (caption, cột nút, đĩa nhạc) và thanh tua trong bước measure/layout; không chỉ nâng riêng bar. Tính viewport video theo khung pager cố định, tuyệt đối không lấy tọa độ màn hình của cell đang cuộn hoặc cell được preload. Scale/crop phải được quyết định từ adaption policy gốc trước frame đầu, giữ fill lên status bar.
+
+Trang cá nhân phải giữ khoảng status bar gốc cho header/nút, không dịch TuxNavBar lên y=0. Khoảng chừa đáy khi ẩn thanh điều hướng áp dụng ở component native của chat, thanh nhập bình luận và bottom sheet; đồng bộ spacer của video mở riêng, không cộng đệm hai lần khi sheet lồng nhau và không cộng phần đệm thêm khi IME đang mở.

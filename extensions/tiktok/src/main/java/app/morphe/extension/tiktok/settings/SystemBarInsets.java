@@ -34,7 +34,8 @@ public final class SystemBarInsets {
         if (view == null) return;
         view.setOnApplyWindowInsetsListener((target, insets) -> {
             Rect bars = systemBarsAndCutout(insets);
-            int bottom = bars.bottom;
+            int bottom = Math.max(bars.bottom,
+                    app.morphe.extension.tiktok.feed.NativeSafeArea.minimumBottom(target));
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 int imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom;
                 if (imeBottom > bottom) bottom = imeBottom;
@@ -47,7 +48,10 @@ public final class SystemBarInsets {
 
     /** Current bars and cutout for an app-owned overlay attached to {@code view}'s window. */
     public static Rect current(View view) {
-        return view == null ? new Rect() : systemBarsAndCutout(view.getRootWindowInsets());
+        if (view == null) return new Rect();
+        Rect bars = systemBarsAndCutout(view.getRootWindowInsets());
+        bars.bottom = Math.max(bars.bottom, app.morphe.extension.tiktok.feed.NativeSafeArea.minimumBottom(view));
+        return bars;
     }
 
     /**

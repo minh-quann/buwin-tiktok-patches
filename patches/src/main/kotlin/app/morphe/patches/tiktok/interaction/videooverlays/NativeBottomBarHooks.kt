@@ -127,11 +127,50 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         val method = definition.methods.single { it.name == name && it.parameterTypes.isEmpty() }
         check(method.implementation!!.registerCount >= 2) { "Native crop: $name has no local register" }
     }
+    // 47.4.3 native keyboard roots/drawer, verified against the input XML and Honor hierarchy.
+    val safeAreas = listOf("LX/1QL4;" to "measureDetailInput", "LX/0XNg;" to "measureChat",
+        "LX/0FOq;" to "measureCommentSheet")
+    safeAreas.forEach { (type, _) ->
+        val view = classDefBy(type)
+        check(view.superclass in listOf("Landroid/widget/LinearLayout;", "Landroid/widget/FrameLayout;"))
+        check(view.methods.none { it.name == "onApplyWindowInsets" })
+    }
+    check(classDefBy("LX/1QL4;").methods.none { it.name == "onDetachedFromWindow" })
+    val sheetType = "Lcom/google/android/material/bottomsheet/BottomSheetBehavior;"
+    val sheetLayout = classDefBy(sheetType).methods.single {
+        it.name == "onLayoutChild" && it.parameterTypes.size == 3
+                && it.parameterTypes[1] == "Landroid/view/View;" && it.returnType == "Z"
+    }
     return {
         val mutable = mutableClassDefBy(owner)
         mutable.interfaces.add(listener)
         listOf(measure, draw, insets, attach, detach, preDraw).forEach { mutable.methods.add(it) }
         measureHooks.forEach { (type, method) -> mutableClassDefBy(type).methods.add(method) }
+        safeAreas.forEach { (type, hook) ->
+            val view = mutableClassDefBy(type)
+            val parentType = checkNotNull(view.superclass)
+            val call = "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->$hook(Landroid/view/View;)V"
+            val existing = view.methods.singleOrNull { it.name == "onMeasure" && it.parameterTypes == listOf("I", "I") }
+            if (existing != null) existing.addInstructions(0, call)
+            else view.methods.add(nativeOverride(type, "onMeasure", listOf("I", "I"), 3, """
+                $call
+                invoke-super { p0, p1, p2 }, $parentType->onMeasure(II)V
+                return-void
+            """))
+            view.methods.add(nativeOverride(type, "onApplyWindowInsets", listOf("Landroid/view/WindowInsets;"), 2, """
+                invoke-virtual { p0 }, Landroid/view/View;->requestLayout()V
+                invoke-super { p0, p1 }, $parentType->onApplyWindowInsets(Landroid/view/WindowInsets;)Landroid/view/WindowInsets;
+                move-result-object p1
+                return-object p1
+            """, "Landroid/view/WindowInsets;", AccessFlags.PUBLIC.value))
+        }
+        mutableClassDefBy(sheetType).methods.single { it.name == sheetLayout.name && it.parameterTypes == sheetLayout.parameterTypes }
+            .addInstructions(0, "invoke-static/range { p2 .. p2 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->measureGenericSheet(Landroid/view/View;)V")
+        mutableClassDefBy("LX/1QL4;").methods.add(nativeOverride("LX/1QL4;", "onDetachedFromWindow", emptyList(), 1, """
+            invoke-static { p0 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->releaseDetailInput(Landroid/view/View;)V
+            invoke-super { p0 }, Landroid/widget/LinearLayout;->onDetachedFromWindow()V
+            return-void
+        """))
         policyHooks.forEach { name ->
             val method = mutableClassDefBy(operator).methods.single { it.name == name && it.parameterTypes.isEmpty() }
             method.addInstructionsWithLabels(0, """
