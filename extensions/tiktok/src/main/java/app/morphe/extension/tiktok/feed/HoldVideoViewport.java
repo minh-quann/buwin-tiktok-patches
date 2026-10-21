@@ -4,6 +4,7 @@
  */
 package app.morphe.extension.tiktok.feed;
 
+import android.graphics.Canvas;
 import android.view.View;
 import android.view.ViewGroup;
 import java.lang.ref.WeakReference;
@@ -23,6 +24,7 @@ public final class HoldVideoViewport {
         final WeakReference<View> cell;
         final int width, height, windowWidth, windowHeight;
         boolean released;
+        boolean pinch;
         Hold(Object owner, View container, int[] size) {
             this.owner = new WeakReference<>(owner);
             cell = new WeakReference<>(SeeThroughStatusBar.findCellRoot(container));
@@ -70,8 +72,18 @@ public final class HoldVideoViewport {
 
     /** PinchComponent calls this before its clean-UI event resizes the native pager. */
     public static void pinch(Object owner, boolean clearing) {
-        if (clearing) begin(owner);
-        else end(owner);
+        if (!clearing) { end(owner); return; }
+        begin(owner);
+        for (Hold hold : HOLDS.values()) {
+            if (hold.owner.get() == owner) hold.pinch = true;
+        }
+    }
+
+    /** Clip the unscaled native cell, not the zoomed texture: the bottom row stays outside zoom. */
+    public static void clipCell(View cell, Canvas canvas) {
+        Hold hold = HOLDS.get(cell.getRootView());
+        if (hold != null && hold.pinch && hold.cell.get() == cell && isHolding(cell))
+            canvas.clipRect(0, 0, hold.width, hold.height);
     }
 
     /** Scene identity survives the native hold temporarily hiding its DM composer. */

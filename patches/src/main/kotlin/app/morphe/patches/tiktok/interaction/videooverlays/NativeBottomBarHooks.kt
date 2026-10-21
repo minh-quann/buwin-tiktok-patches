@@ -106,6 +106,18 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
     """, "Z", AccessFlags.PUBLIC.value)
     val cell = "Lcom/ss/android/ugc/aweme/feed/VideoViewCellRootView;"
     val mask = "Lcom/ss/android/ugc/aweme/feed/ui/seekbar/VideoSeekBarMaskView;"
+    val cellDefinition = classDefBy(cell)
+    check(cellDefinition.methods.none { it.name == "dispatchDraw" }) {
+        "Native pinch viewport: cell now owns dispatchDraw; review before patching"
+    }
+    val cellDraw = nativeOverride(cell, "dispatchDraw", listOf("Landroid/graphics/Canvas;"), 3, """
+        invoke-virtual { p1 }, Landroid/graphics/Canvas;->save()I
+        move-result v0
+        invoke-static { p0, p1 }, Lapp/morphe/extension/tiktok/feed/HoldVideoViewport;->clipCell(Landroid/view/View;Landroid/graphics/Canvas;)V
+        invoke-super { p0, p1 }, ${cellDefinition.superclass}->dispatchDraw(Landroid/graphics/Canvas;)V
+        invoke-virtual { p1, v0 }, Landroid/graphics/Canvas;->restoreToCount(I)V
+        return-void
+    """)
     val measureHooks = listOf(cell to "measureCell", mask to "measureFeed").map { (type, hook) ->
         val definition = classDefBy(type)
         check(definition.methods.none { it.name == "onMeasure" }) {
@@ -230,6 +242,7 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
     }
     check(pinch.implementation!!.registerCount <= 16) { "Native pinch: review parameter register range" }
     return {
+        mutableClassDefBy(cell).methods.add(cellDraw)
         screenWriters.forEach { writer ->
             mutableClassDefBy(screenType).methods.single { it.name == writer.name && it.parameterTypes == writer.parameterTypes }.apply {
                 implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }

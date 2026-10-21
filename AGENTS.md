@@ -34,3 +34,5 @@ Chủ repo dùng Morphe để build APK: chỉ build extension/patch DEX, cập 
 Video mở từ tin nhắn (DetailFeedQuickDMFragment) dùng composer kyn/udg, khác footer f2t. Giữ native safe area cho cả hai và đồng bộ strip cnc của pager; fill video của màn có composer DM lên status bar nhưng giữ header/profile ngoài màn này. Thanh hướng dẫn giữ x2 lệch xuống tổng cộng 12 px, không cộng dồn.
 
 Pinch hai ngón cũng ẩn chrome qua PinchComponent: chốt crop nền trước sự kiện clean UI, giữ tới khi layout trở lại như giữ x2. Màn video mở riêng phải chốt strip theo chiều cao composer sau onMeasure (kể cả divider), đồng bộ slot thanh tua vrd và giữ reserve sau các lần ScreenAdaptionComponent ghi đè; không chỉ thêm padding ô nhập.
+
+Khi pinch zoom, giữ nguyên vùng đen của bottom bar: giới hạn phần vẽ của cell native theo viewport đã chốt, không để texture phóng lớn vẽ vào hàng nút. Container thanh điều khiển clear-mode gốc l6f phải có nền đen trong vùng đó; giữ nguyên kích thước/vị trí nút và không thêm overlay ngoài component.

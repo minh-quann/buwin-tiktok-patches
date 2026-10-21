@@ -26,6 +26,7 @@ public final class NativeBottomBar {
     private static final Map<View, WeakReference<View>> DIVIDERS = new WeakHashMap<>();
     private static final Map<View, int[]> MARGINS = new WeakHashMap<>();
     private static final Map<View, int[]> SEEK_MARGINS = new WeakHashMap<>();
+    private static final Map<View, Drawable> CLEAR_BACKGROUNDS = new WeakHashMap<>();
     private NativeBottomBar() {}
 
     private static boolean enabled() {
@@ -157,6 +158,7 @@ public final class NativeBottomBar {
 
     /** Runs before the native seek mask measures its children, not after a visible frame. */
     public static boolean measureFeed(View mask) {
+        prepareClearBar(mask);
         NativeSafeArea.measureDetailPage(mask);
         if (!(mask instanceof ViewGroup)) return false;
         View bar = tabs(mask);
@@ -191,6 +193,22 @@ public final class NativeBottomBar {
         params.bottomMargin = margin;
         seek.setLayoutParams(params);
         return true;
+    }
+
+    /** TikTok replaces its tabs with this original clear-mode row during pinch zoom. */
+    private static void prepareClearBar(View mask) {
+        int id = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "47.4.3:l6f", false);
+        View row = id == 0 ? null : mask.findViewById(id);
+        if (row == null || row.getParent() != mask) return;
+        if (enabled() && SeeThroughStatusBar.wantsNativeFill(mask)) {
+            if (!CLEAR_BACKGROUNDS.containsKey(row)) CLEAR_BACKGROUNDS.put(row, row.getBackground());
+            blackBackground(row);
+        } else if (CLEAR_BACKGROUNDS.containsKey(row)) {
+            Drawable before = CLEAR_BACKGROUNDS.remove(row);
+            Drawable now = row.getBackground();
+            if (now instanceof ColorDrawable && ((ColorDrawable) now).getColor() == Color.BLACK)
+                row.setBackground(before);
+        }
     }
 
     private static int parentHeight(View view) {
