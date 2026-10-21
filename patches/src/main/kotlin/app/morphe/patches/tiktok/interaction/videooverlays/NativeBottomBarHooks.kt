@@ -186,7 +186,21 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         check(writes.size == 1) { "Native speed hold: ambiguous active-state write" }
         Triple(method.name, writes.single() + 1, keyAndHook.second)
     }
+    // 47.4.3's native pull-down speed-lock pill, independently from the video/widget layout.
+    val guideType = "LX/10fn;"
+    val guide = classDefBy(guideType)
+    check(guide.superclass == "Landroid/widget/LinearLayout;" && "LX/1KtO;" in guide.interfaces
+            && guide.methods.none { it.name == "onMeasure" }
+            && guide.methods.any { it.parameterTypes == listOf("F", "Z") && it.returnType == "V" }) {
+        "Native hold guide: review the pill component before adjusting its margins"
+    }
+    val guideMeasure = nativeOverride(guideType, "onMeasure", listOf("I", "I"), 3, """
+        invoke-static { p0 }, Lapp/morphe/extension/tiktok/feed/HoldVideoViewport;->positionGuide(Landroid/view/View;)V
+        invoke-super { p0, p1, p2 }, Landroid/widget/LinearLayout;->onMeasure(II)V
+        return-void
+    """)
     return {
+        mutableClassDefBy(guideType).methods.add(guideMeasure)
         holdHooks.forEach { (name, index, hook) ->
             mutableClassDefBy(edgeType).methods.single { it.name == name }.addInstructions(index,
                 "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/feed/HoldVideoViewport;->$hook(Ljava/lang/Object;)V")

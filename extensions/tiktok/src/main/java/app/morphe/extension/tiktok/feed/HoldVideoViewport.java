@@ -5,6 +5,7 @@
 package app.morphe.extension.tiktok.feed;
 
 import android.view.View;
+import android.view.ViewGroup;
 import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -13,6 +14,7 @@ import app.morphe.extension.tiktok.blockauthor.Reflect;
 /** Keeps native edge-speedup's temporary chrome hiding out of the video crop calculation. */
 public final class HoldVideoViewport {
     private static final Map<View, int[]> LAST = new WeakHashMap<>();
+    private static final Map<View, int[]> GUIDE_MARGINS = new WeakHashMap<>();
     private static final Map<View, Hold> HOLDS = new WeakHashMap<>();
     private HoldVideoViewport() { }
 
@@ -27,6 +29,22 @@ public final class HoldVideoViewport {
             width = size[0]; height = size[1];
             windowWidth = container.getRootView().getWidth();
             windowHeight = container.getRootView().getHeight();
+        }
+    }
+
+    /** A few physical pixels below the video edge; preserve native size and animations. */
+    public static void positionGuide(View guide) {
+        if (!(guide.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) guide.getLayoutParams();
+        int[] held = GUIDE_MARGINS.get(guide);
+        int top = held != null && params.topMargin == held[0] + held[2] ? held[0] : params.topMargin;
+        int bottom = held != null && params.bottomMargin == held[1] - held[2] ? held[1] : params.bottomMargin;
+        int shift = SeeThroughStatusBar.wantsNativeFill(guide) ? 4 : 0;
+        GUIDE_MARGINS.put(guide, new int[]{top, bottom, shift});
+        if (params.topMargin != top + shift || params.bottomMargin != bottom - shift) {
+            params.topMargin = top + shift;
+            params.bottomMargin = bottom - shift;
+            guide.setLayoutParams(params);
         }
     }
 
