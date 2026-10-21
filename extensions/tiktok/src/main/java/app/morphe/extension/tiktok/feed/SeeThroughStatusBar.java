@@ -357,8 +357,9 @@ public final class SeeThroughStatusBar {
         if (BuwinPause.isPaused() || !SettingsStatus.videoOverlaysEnabled || fitWins()
                 || !Settings.STATUS_BAR_STYLE_SCALE.equals(Settings.STATUS_BAR_STYLE.get())) return false;
         Activity activity = activityOf(video);
-        return FeedVisibility.isFeedWindow(activity) && !FeedVisibility.isDetailPager(activity)
-                && FeedVisibility.isOnFeed(activity);
+        return MessageVideoPage.active(activity)
+                || (FeedVisibility.isFeedWindow(activity) && !FeedVisibility.isDetailPager(activity)
+                    && FeedVisibility.isOnFeed(activity));
     }
 
     /** Stable cell viewport used by the native VideoAdaptionResult hook, including status space. */
@@ -389,7 +390,8 @@ public final class SeeThroughStatusBar {
         }
         if (width <= 0 || height <= 0) return null;
         if (!RememberClearDisplayPatch.isClearDisplayNow() && !RememberClearDisplayPatch.isCarryingClear()) {
-            height = SeeThroughBottomBar.getBottomBarTop(cell, height);
+            height = MessageVideoPage.active(activityOf(video)) ? MessageVideoPage.bottom(cell, height)
+                    : SeeThroughBottomBar.getBottomBarTop(cell, height);
         }
         int[] stable = HoldVideoViewport.size(video, width, height);
         View parent = (View) video.getParent();
@@ -512,7 +514,9 @@ public final class SeeThroughStatusBar {
         if (clearDisplay) {
             targetHeight = fullHeight;
         } else {
-            int barTop = SeeThroughBottomBar.getBottomBarTop(cell != null ? cell : player, fullHeight);
+            int barTop = MessageVideoPage.active(activity)
+                    ? MessageVideoPage.bottom(cell != null ? cell : player, fullHeight)
+                    : SeeThroughBottomBar.getBottomBarTop(cell != null ? cell : player, fullHeight);
             targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : fullHeight;
         }
         if (targetHeight <= 0) targetHeight = fullHeight;

@@ -39,7 +39,7 @@ public final class HoldVideoViewport {
         int[] held = GUIDE_MARGINS.get(guide);
         int top = held != null && params.topMargin == held[0] + held[2] ? held[0] : params.topMargin;
         int bottom = held != null && params.bottomMargin == held[1] - held[2] ? held[1] : params.bottomMargin;
-        int shift = SeeThroughStatusBar.wantsNativeFill(guide) ? 4 : 0;
+        int shift = SeeThroughStatusBar.wantsNativeFill(guide) ? 12 : 0;
         GUIDE_MARGINS.put(guide, new int[]{top, bottom, shift});
         if (params.topMargin != top + shift || params.bottomMargin != bottom - shift) {
             params.topMargin = top + shift;
@@ -66,6 +66,16 @@ public final class HoldVideoViewport {
         for (Hold hold : HOLDS.values()) {
             if (hold.owner.get() == owner) hold.released = true;
         }
+    }
+
+    /** Scene identity survives the native hold temporarily hiding its DM composer. */
+    static boolean hasPendingHold(View view) {
+        if (view == null) return false;
+        View root = view.getRootView();
+        Hold hold = HOLDS.get(root);
+        View cell = hold == null ? null : hold.cell.get();
+        return hold != null && hold.owner.get() != null && cell != null && cell.isAttachedToWindow()
+                && root.getWidth() == hold.windowWidth && root.getHeight() == hold.windowHeight;
     }
 
     /** Also covers the release frame while native chrome/layout is still being restored. */

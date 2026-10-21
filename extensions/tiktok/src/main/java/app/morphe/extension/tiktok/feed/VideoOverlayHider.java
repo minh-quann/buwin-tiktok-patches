@@ -627,7 +627,8 @@ public final class VideoOverlayHider {
             // which it shows only in Clear display; see gateClearControls.
             boolean clearControls = !BuwinPause.isPaused() && Settings.HIDE_CLEAR_DISPLAY_CONTROLS.get();
             boolean statusBar = Settings.HIDE_STATUS_BAR.get();
-            boolean seeThroughStatusBar = !detailPager && FeedVisibility.isOnFeed(activity);
+            boolean seeThroughStatusBar = MessageVideoPage.active(activity)
+                    || (!detailPager && FeedVisibility.isOnFeed(activity));
             boolean commentsOpen = FeedVisibility.isCommentSheetVisible(activity);
             // The bottom bar goes clear and the spacer under each video goes, on the main feed
             // only: the opened-post pager has no tab bar (#145).
@@ -815,7 +816,8 @@ public final class VideoOverlayHider {
 
             setStatusBarHidden(activity, statusBar);
             // Only while the feed is in front: the window's other pages keep the color TikTok gives them.
-            boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity);
+            boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity)
+                    || MessageVideoPage.active(activity);
             SeeThroughStatusBar.apply(activity, onFeed);
         } catch (Throwable ex) {
             Logger.printException(() -> "Video overlay hider failed", ex);

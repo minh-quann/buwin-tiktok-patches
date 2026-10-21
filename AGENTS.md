@@ -30,3 +30,5 @@ Burn-in pixel shift chỉ được dịch foreground controls (khử trùng lặ
 Nhấn giữ cạnh để tăng tốc chỉ được đổi tốc độ và chrome; chốt viewport trước khi native EdgeSpeedupAssem ẩn bottom bar/clear UI, giữ tới khi bố cục trở lại sau release. Không tính crop lại theo visibility tạm thời của thanh điều hướng, không làm video phóng/thu theo thao tác giữ x2.
 
 Chủ repo dùng Morphe để build APK: chỉ build extension/patch DEX, cập nhật cache và push; không xuất APK riêng trừ khi được yêu cầu. Khi giữ x2 phải chốt cả native margins của widget/caption và tâm đường tua; giữ vị trí qua việc ẩn bar, đổi chiều cao touch target và reflow parent, không chỉ chốt khung video.
+
+Video mở từ tin nhắn (DetailFeedQuickDMFragment) dùng composer kyn/udg, khác footer f2t. Giữ native safe area cho cả hai và đồng bộ strip cnc của pager; fill video của màn có composer DM lên status bar nhưng giữ header/profile ngoài màn này. Thanh hướng dẫn giữ x2 lệch xuống tổng cộng 12 px, không cộng dồn.

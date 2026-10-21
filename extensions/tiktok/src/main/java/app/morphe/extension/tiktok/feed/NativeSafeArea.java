@@ -74,6 +74,9 @@ public final class NativeSafeArea {
     /** The opened-video composer and its original pager spacer share the added height. */
     public static void measureDetailInput(View root) {
         View footer = child(root, "47.4.3:f2t");
+        // DetailFeedQuickDMFragment reuses the same native keyboard root, but its real
+        // input row is udg (there is no f2t child in that layout).
+        if (footer == null) footer = child(root, "47.4.3:udg");
         if (footer == null || footer == root) return;
         int added = pad(footer, minimumBottom(root));
         View window = root.getRootView();
