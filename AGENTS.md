@@ -22,3 +22,5 @@ Khoảng kê/nền đen ở đáy phải thuộc component bottom tabs gốc; kh
 Khi tăng chiều cao bottom tabs, phải nâng đồng bộ widget native (caption, cột nút, đĩa nhạc) và thanh tua trong bước measure/layout; không chỉ nâng riêng bar. Tính viewport video theo khung pager cố định, tuyệt đối không lấy tọa độ màn hình của cell đang cuộn hoặc cell được preload. Scale/crop phải được quyết định từ adaption policy gốc trước frame đầu, giữ fill lên status bar.
 
 Trang cá nhân phải giữ khoảng status bar gốc cho header/nút, không dịch TuxNavBar lên y=0. Khoảng chừa đáy khi ẩn thanh điều hướng áp dụng ở component native của chat, thanh nhập bình luận và bottom sheet; đồng bộ spacer của video mở riêng, không cộng đệm hai lần khi sheet lồng nhau và không cộng phần đệm thêm khi IME đang mở.
+
+Crop phải dựa trên kích thước luồng gốc: chỉ fill video dọc, giữ nguyên video ngang và nút toàn màn hình. Trong chế độ fill, chặn native comment-shrink trước animation để đóng sheet không nhảy từ khung nhỏ sang fill. LIVE preview dùng SurfaceView riêng: sửa onMeasure native, chỉ crop surface, nâng cả nhóm tips/user và card thương mại ở đáy; không scale card hoặc áp dụng vào phòng LIVE đã mở.

@@ -18,6 +18,7 @@ public final class CommentShrink {
      * Invoked directly by bytecode patch from VideoShrinkComponent.
      */
     public static boolean shouldDisableShrink() {
-        return SettingsStatus.commentShrinkControlEnabled && Settings.DISABLE_COMMENT_SHRINK.get();
+        return app.morphe.extension.tiktok.interaction.StatusBarVideoFill.keepFullSizeOnComments()
+                || (SettingsStatus.commentShrinkControlEnabled && Settings.DISABLE_COMMENT_SHRINK.get());
     }
 }

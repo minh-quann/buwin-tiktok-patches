@@ -379,12 +379,36 @@ public final class SeeThroughStatusBar {
         if (cell == null || cell == video || !(video.getParent() instanceof View)) return null;
         int width = cell.getMeasuredWidth() > 0 ? cell.getMeasuredWidth() : cell.getWidth();
         int height = cell.getMeasuredHeight() > 0 ? cell.getMeasuredHeight() : cell.getHeight();
+        for (ViewParent p = cell.getParent(); p instanceof View; p = p.getParent()) {
+            View ancestor = (View) p;
+            if ("viewpager_container".equals(getViewIdName(ancestor))) {
+                if (ancestor.getMeasuredWidth() > 0) width = ancestor.getMeasuredWidth();
+                if (ancestor.getMeasuredHeight() > 0) height = ancestor.getMeasuredHeight();
+                break;
+            }
+        }
         if (width <= 0 || height <= 0) return null;
         if (!RememberClearDisplayPatch.isClearDisplayNow() && !RememberClearDisplayPatch.isCarryingClear()) {
             height = SeeThroughBottomBar.getBottomBarTop(cell, height);
         }
         View parent = (View) video.getParent();
-        return new float[]{width, height, leftInParent(parent, cell), topInParent(parent, cell)};
+        return new float[]{width, height,
+                renderOrigin(parent, cell, true) + parent.getPaddingLeft(),
+                renderOrigin(parent, cell, false) + parent.getPaddingTop()};
+    }
+
+    private static float renderOrigin(View target, View cell, boolean horizontal) {
+        float result = 0;
+        for (View current = target; current != null && current != cell;) {
+            result += horizontal ? current.getLeft() + current.getTranslationX()
+                    : current.getTop() + current.getTranslationY();
+            ViewParent parent = current.getParent();
+            if (!(parent instanceof View)) break;
+            View group = (View) parent;
+            result -= horizontal ? group.getScrollX() : group.getScrollY();
+            current = group;
+        }
+        return result;
     }
 
     public static void releaseFillTransforms(View nativeView) {
@@ -497,6 +521,10 @@ public final class SeeThroughStatusBar {
             // any legacy surface transform before TikTok applied its result.
             return;
         }
+        if (doScale && surface != null && surface.getWidth() > surface.getHeight()) {
+            releaseFillTransforms(player);
+            return;
+        }
         if (doScale) {
             // Scale mode: center and aspect fill from y=0 to targetHeight (meeting the solid black bottom bar)
             View targetView = surface != null ? surface : player;
@@ -525,7 +553,6 @@ public final class SeeThroughStatusBar {
                 float scaleY = (float) (targetHeight + 2) / (float) vHeight;
                 float neededScale = Math.max(scaleX, scaleY);
                 if (neededScale < 1f) neededScale = 1f;
-                if (neededScale > MAX_FILL_SCALE) neededScale = MAX_FILL_SCALE;
 
                 float targetCenterX = cellWidth / 2f;
                 float currentCenterX = leftInParent(targetView, cell) + vWidth / 2f;

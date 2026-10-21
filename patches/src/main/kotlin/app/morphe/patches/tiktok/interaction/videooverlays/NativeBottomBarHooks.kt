@@ -14,6 +14,8 @@ import app.morphe.util.getReference
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodImplementation
@@ -141,6 +143,26 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         it.name == "onLayoutChild" && it.parameterTypes.size == 3
                 && it.parameterTypes[1] == "Landroid/view/View;" && it.returnType == "Z"
     }
+    val paramsType = "Lcom/ss/android/ugc/aweme/videoadaption/adaptionparams/VideoAdaptionParams;"
+    val paramsInit = classDefBy(paramsType).methods.single { it.name == "<init>" }
+    listOf("getVideoWidth", "getVideoHeight", "getParamsOperator").forEach { getter ->
+        check(classDefBy(paramsType).methods.any { it.name == getter && it.parameterTypes.isEmpty() })
+    }
+    val strategyType = "LX/08Nx;"
+    val strategy = classDefBy(strategyType).methods.single { it.name == "LIZLLL" && it.parameterTypes.size == 3
+            && it.parameterTypes[1] == paramsType }
+    val shrinkType = "Lcom/ss/android/ugc/feed/platform/cell/shrink/VideoShrinkComponent;"
+    val shrinkMethods = listOf(listOf("I", "I"), listOf("J", "Z", "Z")).map { types ->
+        classDefBy(shrinkType).methods.single { it.parameterTypes == types && it.returnType == "V" }.name
+    }
+    val liveType = "LX/0KOM;"
+    check(classDefBy(liveType).superclass == "Landroid/view/SurfaceView;")
+    val liveMeasure = classDefBy(liveType).methods.single { it.name == "onMeasure" && it.parameterTypes == listOf("I", "I") }
+    check(liveMeasure.implementation!!.registerCount - 3 >= 5)
+    val liveSize = classDefBy(liveType).methods.single { it.name == "setVideoSize" && it.parameterTypes == listOf("I", "I") }
+    val videoFields = liveSize.implementation!!.instructions.filter { it.opcode == Opcode.IPUT }
+        .mapNotNull { it.getReference<FieldReference>() }.filter { it.definingClass == liveType && it.type == "I" }
+    check(videoFields.size == 2) { "LIVE preview no longer stores one width and one height" }
     return {
         val mutable = mutableClassDefBy(owner)
         mutable.interfaces.add(listener)
@@ -171,11 +193,52 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
             invoke-super { p0 }, Landroid/widget/LinearLayout;->onDetachedFromWindow()V
             return-void
         """))
+        mutableClassDefBy(paramsType).methods.single { it.name == paramsInit.name }.apply {
+            implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }
+                .reversed().forEach { addInstructions(it, "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/interaction/StatusBarVideoFill;->rememberParams(Ljava/lang/Object;)V") }
+        }
+        mutableClassDefBy(strategyType).methods.single { it.name == strategy.name && it.parameterTypes == strategy.parameterTypes }.apply {
+            val code = implementation!!.instructions.toList()
+            code.indices.filter { code[it].opcode == Opcode.RETURN_OBJECT }.reversed().forEach { index ->
+                val register = (code[index] as OneRegisterInstruction).registerA
+                check(implementation!!.registerCount <= 16)
+                addInstructions(index, "invoke-static { v$register, p2 }, Lapp/morphe/extension/tiktok/interaction/StatusBarVideoFill;->rememberResult(Ljava/lang/Object;Ljava/lang/Object;)V")
+            }
+        }
+        shrinkMethods.forEach { name ->
+            mutableClassDefBy(shrinkType).methods.single { it.name == name && it.returnType == "V" }.apply {
+                check(implementation!!.registerCount - 1 - parameterTypes.sumOf { if (it == "J" || it == "D") 2 else 1 } >= 1)
+                addInstructionsWithLabels(0, """
+                    invoke-static {}, Lapp/morphe/extension/tiktok/playback/CommentShrink;->shouldDisableShrink()Z
+                    move-result v0
+                    if-eqz v0, :native_shrink_original
+                    return-void
+                """, ExternalLabel("native_shrink_original", getInstruction(0)))
+            }
+        }
+        mutableClassDefBy(liveType).methods.single { it.name == "onMeasure" && it.parameterTypes == liveMeasure.parameterTypes }.apply {
+            addInstructionsWithLabels(0, """
+                move-object/from16 v4, p0
+                iget v0, v4, $liveType->${videoFields[0].name}:I
+                iget v1, v4, $liveType->${videoFields[1].name}:I
+                invoke-static { v4, v0, v1 }, Lapp/morphe/extension/tiktok/interaction/NativeLivePreview;->measure(Landroid/view/View;II)J
+                move-result-wide v0
+                const-wide/16 v2, 0x0
+                cmp-long v4, v0, v2
+                if-lez v4, :native_live_original
+                long-to-int v3, v0
+                const/16 v2, 0x20
+                ushr-long/2addr v0, v2
+                long-to-int v2, v0
+                move-object/from16 v4, p0
+                invoke-virtual { v4, v2, v3 }, Landroid/view/View;->setMeasuredDimension(II)V
+                return-void
+            """, ExternalLabel("native_live_original", getInstruction(0)))
+        }
         policyHooks.forEach { name ->
             val method = mutableClassDefBy(operator).methods.single { it.name == name && it.parameterTypes.isEmpty() }
             method.addInstructionsWithLabels(0, """
-                iget-object v0, p0, $operator->eventType:Ljava/lang/String;
-                invoke-static { v0 }, Lapp/morphe/extension/tiktok/interaction/StatusBarVideoFill;->useNativeCrop(Ljava/lang/String;)Z
+                invoke-static { p0 }, Lapp/morphe/extension/tiktok/interaction/StatusBarVideoFill;->useNativeCrop(Ljava/lang/Object;)Z
                 move-result v0
                 if-eqz v0, :native_crop_original
                 ${if (name == "getForceScaleType") "sget-object v0, $scaleType->CROP:$scaleType\nreturn-object v0" else "const/4 v0, 0x0\nreturn v0"}

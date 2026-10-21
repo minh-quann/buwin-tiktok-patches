@@ -115,6 +115,19 @@ public final class NativeBottomBar {
         if (widgets != null) moveMargins(widgets, reserve(tabs(cell)));
     }
 
+    /** LIVE uses an ordinary FrameLayout cell and its own commerce/tips constraint group. */
+    public static void measureLiveCell(View surface) {
+        View cell = SeeThroughStatusBar.findCellRoot(surface);
+        if (cell == null) return;
+        int lift = reserve(tabs(cell));
+        // The product card is a sibling of the tips/user group, not a child of it.
+        for (String name : new String[]{"47.4.3:o3v", "47.4.3:stb"}) {
+            int id = IDS.resolve(cell.getResources(), cell.getContext().getPackageName(), name, false);
+            View controls = id == 0 ? null : cell.findViewById(id);
+            if (controls != null) moveMargins(controls, lift);
+        }
+    }
+
     /** Move the native widget layout without changing its measured size or adding an overlay. */
     private static boolean moveMargins(View view, int lift) {
         if (!(view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return false;

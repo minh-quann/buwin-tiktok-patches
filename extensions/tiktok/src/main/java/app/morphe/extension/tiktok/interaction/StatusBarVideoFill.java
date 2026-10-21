@@ -28,13 +28,76 @@ import app.morphe.extension.shared.settings.BuwinPause;
  */
 public final class StatusBarVideoFill {
     private static final Map<View, Bound> BOUND = new WeakHashMap<>();
+    private static final Map<View, Boolean> LANDSCAPE = new WeakHashMap<>();
+    private static final WeakIdentityTable SOURCES = new WeakIdentityTable();
+    private static final WeakIdentityTable RESULTS = new WeakIdentityTable();
     private StatusBarVideoFill() {}
 
+    /** Native params/results are data classes: equal values must not alias different videos. */
+    private static final class WeakIdentityTable {
+        final java.lang.ref.ReferenceQueue<Object> queue = new java.lang.ref.ReferenceQueue<>();
+        final Map<Key, Source> values = new java.util.HashMap<>();
+        static final class Key extends WeakReference<Object> {
+            final int hash;
+            Key(Object value, java.lang.ref.ReferenceQueue<Object> queue) {
+                super(value, queue);
+                hash = System.identityHashCode(value);
+            }
+            @Override public int hashCode() { return hash; }
+            @Override public boolean equals(Object other) {
+                return this == other || (other instanceof Key && get() != null && get() == ((Key) other).get());
+            }
+        }
+        private void sweep() {
+            java.lang.ref.Reference<?> dead;
+            while ((dead = queue.poll()) != null) values.remove(dead);
+        }
+        synchronized void put(Object key, Source value) {
+            sweep();
+            values.put(new Key(key, queue), value);
+        }
+        synchronized Source get(Object key) {
+            if (key == null) return null;
+            sweep();
+            return values.get(new Key(key, null));
+        }
+    }
+
+    private static final class Source {
+        final int width, height;
+        final boolean feed;
+        Source(Object params) {
+            width = size(params, "getVideoWidth");
+            height = size(params, "getVideoHeight");
+            Object operator = Reflect.invoke(params, "getParamsOperator");
+            feed = feedEvent(Reflect.readField(operator, "eventType"));
+        }
+    }
+
+    /** Original stream dimensions, recorded before any crop strategy can change their ratio. */
+    public static void rememberParams(Object params) {
+        Object operator = Reflect.invoke(params, "getParamsOperator");
+        if (operator != null) SOURCES.put(operator, new Source(params));
+    }
+
+    public static void rememberResult(Object result, Object params) {
+        if (result != null && params != null) RESULTS.put(result, new Source(params));
+    }
+
+    public static boolean keepFullSizeOnComments() {
+        return SettingsStatus.videoOverlaysEnabled && !BuwinPause.isPaused()
+                && !Settings.FIT_VIDEO_TO_SCREEN.get()
+                && Settings.STATUS_BAR_STYLE_SCALE.equals(Settings.STATUS_BAR_STYLE.get());
+    }
+
     /** Native feed adaption policy, before any surface receives its initial dimensions. */
-    public static boolean useNativeCrop(String event) {
-        if (!SettingsStatus.videoOverlaysEnabled || BuwinPause.isPaused()
-                || Settings.FIT_VIDEO_TO_SCREEN.get()
-                || !Settings.STATUS_BAR_STYLE_SCALE.equals(Settings.STATUS_BAR_STYLE.get())) return false;
+    public static boolean useNativeCrop(Object operator) {
+        Source source = SOURCES.get(operator);
+        return keepFullSizeOnComments() && source != null && source.feed
+                && source.width > 0 && source.height >= source.width;
+    }
+
+    private static boolean feedEvent(Object event) {
         return "homepage_hot".equals(event) || "homepage_follow".equals(event)
                 || "homepage_friends".equals(event) || "homepage_nearby".equals(event)
                 || "homepage_fresh".equals(event) || "homepage_popular".equals(event);
@@ -42,14 +105,31 @@ public final class StatusBarVideoFill {
 
     /** Null means this isn't the main feed's scale mode, or the result cannot be copied. */
     static Object fitted(View video, Object original) {
-        if (!SeeThroughStatusBar.wantsNativeFill(video)
-                || !(video.getLayoutParams() instanceof FrameLayout.LayoutParams)) return null;
-        float[] viewport = SeeThroughStatusBar.nativeFillViewport(video);
+        if (!SeeThroughStatusBar.wantsNativeFill(video)) {
+            LANDSCAPE.remove(video);
+            return null;
+        }
+        Source source = RESULTS.get(original);
+        if (source == null) {
+            Object operator = Reflect.invoke(original, "getResultOperator");
+            Object params = Reflect.invoke(operator, "getVideoAdaptionParams");
+            if (params != null) source = new Source(params);
+        }
         int width = size(original, "getWidth"), height = size(original, "getHeight");
+        if ((source != null && source.width > source.height) || (source == null && width > height)) {
+            LANDSCAPE.put(video, Boolean.TRUE);
+            SeeThroughStatusBar.releaseFillTransforms(video);
+            return null;
+        }
+        LANDSCAPE.remove(video);
+        if (!(video.getLayoutParams() instanceof FrameLayout.LayoutParams)) return null;
+        float[] viewport = SeeThroughStatusBar.nativeFillViewport(video);
         if (width <= 0 || height <= 0) return null;
+        int ratioWidth = source != null && source.width > 0 ? source.width : width;
+        int ratioHeight = source != null && source.height > 0 ? source.height : height;
         Geometry geometry = viewport == null
                 ? new Geometry(width, height, offset(original, "getTranslateX"), offset(original, "getTranslateY"))
-                : geometry(width, height, viewport, (FrameLayout.LayoutParams) video.getLayoutParams());
+                : geometry(ratioWidth, ratioHeight, viewport, (FrameLayout.LayoutParams) video.getLayoutParams());
         Object copy = VideoFit.copyOf(original, geometry.width, geometry.height,
                 new float[]{geometry.x, geometry.y});
         if (copy == null) return null;
@@ -64,6 +144,8 @@ public final class StatusBarVideoFill {
         }
         bound.sourceWidth = width;
         bound.sourceHeight = height;
+        bound.ratioWidth = ratioWidth;
+        bound.ratioHeight = ratioHeight;
         bound.sourceX = offset(original, "getTranslateX");
         bound.sourceY = offset(original, "getTranslateY");
         if (viewport != null) topLeft(video);
@@ -82,14 +164,14 @@ public final class StatusBarVideoFill {
     }
 
     static Geometry geometry(int width, int height, float[] viewport, FrameLayout.LayoutParams params) {
-        // Preserve the previous mode's crop limit and two-pixel edge coverage.
-        double scale = Math.min(1.45, Math.max(1, Math.max(
-                (viewport[0] + 2) / width, (viewport[1] + 2) / height)));
+        // Cover every edge from the ORIGINAL stream ratio. A crop cap can leave gaps; deriving
+        // the ratio from an already cropped result compounds rounding on recycled cells.
+        double scale = Math.max((viewport[0] + 4.0) / width, (viewport[1] + 4.0) / height);
         int filledWidth = (int) Math.ceil(width * scale);
         int filledHeight = (int) Math.ceil(height * scale);
         return new Geometry(filledWidth, filledHeight,
-                (viewport[0] - filledWidth) / 2f - viewport[2] - params.leftMargin,
-                (viewport[1] - filledHeight) / 2f - viewport[3] - params.topMargin);
+                (float) Math.floor((viewport[0] - filledWidth) / 2) - viewport[2] - params.leftMargin,
+                (float) Math.floor((viewport[1] - filledHeight) / 2) - viewport[3] - params.topMargin);
     }
 
     private static void topLeft(View video) {
@@ -103,11 +185,13 @@ public final class StatusBarVideoFill {
     /** Is the player, or its rendering surface, already sized by the native hook? */
     public static boolean handles(View player) {
         for (View current = player; current != null;) {
-            if (BOUND.containsKey(current)) return true;
+            if (BOUND.containsKey(current) || LANDSCAPE.containsKey(current)) return true;
             ViewParent parent = current.getParent();
             current = parent instanceof View ? (View) parent : null;
         }
-        for (View nativeView : BOUND.keySet()) {
+        java.util.Set<View> controlled = new java.util.HashSet<>(BOUND.keySet());
+        controlled.addAll(LANDSCAPE.keySet());
+        for (View nativeView : controlled) {
             for (ViewParent parent = nativeView.getParent(); parent instanceof View; parent = parent.getParent()) {
                 if (parent == player) return true;
             }
@@ -150,6 +234,7 @@ public final class StatusBarVideoFill {
         final WeakReference<View> video;
         final int gravity;
         int sourceWidth, sourceHeight;
+        int ratioWidth, ratioHeight;
         float sourceX, sourceY;
 
         Bound(View view) {
@@ -169,7 +254,7 @@ public final class StatusBarVideoFill {
             FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
             Geometry geometry = viewport == null
                     ? new Geometry(sourceWidth, sourceHeight, sourceX, sourceY)
-                    : geometry(sourceWidth, sourceHeight, viewport, params);
+                    : geometry(ratioWidth, ratioHeight, viewport, params);
             boolean resize = params.width != geometry.width || params.height != geometry.height;
             boolean gravityChanged = params.gravity != (viewport == null ? gravity : (Gravity.TOP | Gravity.LEFT));
             if (viewport == null) release(view);
