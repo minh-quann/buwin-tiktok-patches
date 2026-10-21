@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.Window;
 
 import app.morphe.extension.shared.Logger;
@@ -21,6 +22,10 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.ArrayList;
 import java.util.WeakHashMap;
 
 /**
@@ -34,10 +39,10 @@ import java.util.WeakHashMap;
  * faded control lets taps through, still follow Fade the video controls alone, so a dim never
  * brings back a control Clear display took away.
  *
- * <p>The shift moves the window's content around a small square, {@link #STEP_DP} at a time, every
- * {@link #SHIFT_EVERY_MS}. It's one view's translation, the content frame's, which TikTok doesn't
- * animate, where each control's would be fought over with TikTok's own animations. The strip it
- * uncovers at the edge is the window's own background.
+ * <p>The shift moves only foreground controls around a small square, {@link #STEP_DP} at a time,
+ * every {@link #SHIFT_EVERY_MS}. The Activity, video surface, and navigation background stay in
+ * place: translating the content frame exposes the window background as random black edges.
+ * Nested controls share their outermost control's shift so it is never added twice.
  *
  * <p>Both run only over the feed or an opened video, not under Pause and not without the overlay
  * patch. Anywhere else nothing dims and the content goes back where it was. A window getting focus
@@ -61,8 +66,11 @@ public final class BurnInGuard {
     };
 
     private static final Map<Window, Boolean> WRAPPED = new WeakHashMap<>();
-    /** Content views this class moved: the [x, y] they had, then the [x, y] written here. */
+    /** Foreground controls: their native [x, y], followed by the last [x, y] written here. */
     private static final Map<View, float[]> MOVED = new WeakHashMap<>();
+    private static final Set<View> CONTROLS = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static boolean shiftingControls;
+    private static float shiftX, shiftY;
     private static final Runnable TICK = BurnInGuard::tick;
 
     private static Handler handler;
@@ -91,7 +99,7 @@ public final class BurnInGuard {
 
     /**
      * Runs with every overlay pass. Answers the level the fade draws the controls at this pass,
-     * {@code chosen} unless the screen has gone untouched, moves the content or puts it back, and
+     * {@code chosen} unless the screen has gone untouched, moves the controls or puts them back, and
      * asks for a pass at the moment either next changes, since nothing lays out on its own while
      * a video just plays. {@code allowed} is false under Pause and without the overlay patch.
      */
@@ -118,7 +126,12 @@ public final class BurnInGuard {
         boolean canDim = on && chosen > targetIdleLevel;
         dimmed = canDim && !fingerDown && now - touchedAt >= IDLE_AFTER_MS;
         boolean shifting = on && DIM_AND_SHIFT.equals(mode);
-        place(activity, shifting, now);
+        CONTROLS.clear();
+        shiftingControls = shifting;
+        int[] at = placeAt(now);
+        float step = STEP_DP * activity.getResources().getDisplayMetrics().density;
+        shiftX = at[0] * step;
+        shiftY = at[1] * step;
         // No dim is timed while a finger is down; its lift asks for the pass that times one.
         schedule(Math.min(canDim && !dimmed && !fingerDown ? touchedAt + IDLE_AFTER_MS : Long.MAX_VALUE,
                 shifting ? (now / SHIFT_EVERY_MS + 1) * SHIFT_EVERY_MS : Long.MAX_VALUE));
@@ -130,34 +143,54 @@ public final class BurnInGuard {
         return PLACES[(int) ((now / SHIFT_EVERY_MS) % PLACES.length)];
     }
 
-    private static void place(Activity activity, boolean shifting, long now) {
-        View content = activity.findViewById(android.R.id.content);
-        if (content == null) return;
-        float[] held = MOVED.get(content);
-        if (!shifting) {
-            if (held != null) {
-                MOVED.remove(content);
-                if (content.getTranslationX() == held[2]) content.setTranslationX(held[0]);
-                if (content.getTranslationY() == held[3]) content.setTranslationY(held[1]);
+    static boolean shiftsControls() { return shiftingControls; }
+
+    /** Called for native foreground targets already selected by the overlay traversal. */
+    static void control(View view) {
+        if (shiftingControls && view != null && view.getId() != android.R.id.content) CONTROLS.add(view);
+    }
+
+    /** Finish after the traversal: restore stale targets first, then shift each group once. */
+    static void finishControls() {
+        Set<View> outer = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (shiftingControls) {
+            for (View view : CONTROLS) {
+                boolean nested = false;
+                for (ViewParent p = view.getParent(); p instanceof View; p = p.getParent()) {
+                    if (CONTROLS.contains(p)) { nested = true; break; }
+                }
+                if (!nested) outer.add(view);
             }
-            return;
         }
-        float x = content.getTranslationX();
-        float y = content.getTranslationY();
+        for (View view : new ArrayList<>(MOVED.keySet())) {
+            if (!outer.contains(view)) restore(view);
+        }
+        for (View view : outer) move(view, shiftX, shiftY);
+        CONTROLS.clear();
+    }
+
+    private static void restore(View view) {
+        float[] held = MOVED.remove(view);
+        if (held == null) return;
+        if (view.getTranslationX() == held[2]) view.setTranslationX(held[0]);
+        if (view.getTranslationY() == held[3]) view.setTranslationY(held[1]);
+    }
+
+    private static void move(View view, float dx, float dy) {
+        float x = view.getTranslationX(), y = view.getTranslationY();
+        float[] held = MOVED.get(view);
         if (held == null) {
             held = new float[]{x, y, x, y};
-            MOVED.put(content, held);
+            MOVED.put(view, held);
         } else {
-            // Something else wrote its own since the last pass; that's where the content is now.
+            // Adopt host animations/rebinds, without accumulating our previous shift.
             if (x != held[2]) held[0] = x;
             if (y != held[3]) held[1] = y;
         }
-        int[] at = placeAt(now);
-        float step = STEP_DP * content.getResources().getDisplayMetrics().density;
-        held[2] = held[0] + at[0] * step;
-        held[3] = held[1] + at[1] * step;
-        if (x != held[2]) content.setTranslationX(held[2]);
-        if (y != held[3]) content.setTranslationY(held[3]);
+        held[2] = held[0] + dx;
+        held[3] = held[1] + dy;
+        if (x != held[2]) view.setTranslationX(held[2]);
+        if (y != held[3]) view.setTranslationY(held[3]);
     }
 
     private static void schedule(long next) {
@@ -246,6 +279,8 @@ public final class BurnInGuard {
         guarding = false;
         dimmed = false;
         passed = new WeakReference<>(null);
-        MOVED.clear();
+        for (View view : new ArrayList<>(MOVED.keySet())) restore(view);
+        CONTROLS.clear();
+        shiftingControls = false;
     }
 }

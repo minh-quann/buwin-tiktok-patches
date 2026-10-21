@@ -664,7 +664,8 @@ public final class VideoOverlayHider {
                     || statusBar || seeThroughStatusBar || SeeThroughStatusBar.anyFilled()
                     || seeThroughBar || SeeThroughBottomBar.holdsBackground()
                     || anyRail || !HIDDEN_HERE.isEmpty() || !FADED_HERE.isEmpty() || !WIDGETS_LIFTED.isEmpty()
-                    || fadeLevel != 100 || !FADED_TO.isEmpty() || !BAR_ROWS_MOVED.isEmpty()
+                    || fadeLevel != 100 || BurnInGuard.shiftsControls()
+                    || !FADED_TO.isEmpty() || !BAR_ROWS_MOVED.isEmpty()
                     || !CAPTIONS_LIFTED.isEmpty() || !DISCS_LIFTED.isEmpty() || !RAILS_LIFTED.isEmpty()
                     || touchScale != 1f || scaledLastPass
                     || (!detailPager && !SeeThroughBottomBar.isSystemIndicatorActive(activity.getWindow() != null ? activity.getWindow().getDecorView() : null))) {
@@ -818,6 +819,8 @@ public final class VideoOverlayHider {
             SeeThroughStatusBar.apply(activity, onFeed);
         } catch (Throwable ex) {
             Logger.printException(() -> "Video overlay hider failed", ex);
+        } finally {
+            BurnInGuard.finishControls();
         }
     }
 
@@ -2362,6 +2365,7 @@ public final class VideoOverlayHider {
         for (int i = 0, count = vg.getChildCount(); i < count; i++) {
             View child = vg.getChildAt(i);
             if (child != null) {
+                BurnInGuard.control(child);
                 if (percent >= 100) {
                     FADED_TO.remove(child);
                     if (child.getAlpha() != 1.0f) {
@@ -2394,6 +2398,7 @@ public final class VideoOverlayHider {
         if (view == null) {
             return;
         }
+        BurnInGuard.control(view);
         float[] held = FADED_TO.get(view);
         if (percent >= 100) {
             if (held != null) {

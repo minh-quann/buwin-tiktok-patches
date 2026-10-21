@@ -32,7 +32,7 @@ import org.robolectric.annotation.Config;
 /**
  * Burn-in guard: the controls the fade covers dim after five seconds without a touch, through a
  * pass the guard asks for itself, and the next touch or the window coming back brings them back.
- * The shift moves the window's content every two minutes and puts it back when it's turned off.
+ * The shift moves foreground controls every two minutes while the video/window stay in place.
  * Off, Pause and a fade already below the dim leave the level alone, and Clear display keeps
  * following the chosen fade.
  */
@@ -271,29 +271,35 @@ public class BurnInGuardTest {
     }
 
     @Test
-    public void theShiftMovesTheContentEveryTwoMinutesAndPutsItBack() {
+    public void theShiftMovesOnlyControlsEveryTwoMinutesAndPutsThemBack() {
         try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
             feed(controller.get());
             View content = activity.findViewById(android.R.id.content);
             float step = BurnInGuard.STEP_DP * activity.getResources().getDisplayMetrics().density;
             Settings.BURN_IN_GUARD.save(BurnInGuard.DIM_AND_SHIFT);
             VideoOverlayHider.applyTo(activity);
-            assertAt(content, step);
-            float x = content.getTranslationX();
-            float y = content.getTranslationY();
+            assertAt(column, step);
+            assertEquals(0f, content.getTranslationX(), 0f);
+            assertEquals(0f, content.getTranslationY(), 0f);
+            float x = column.getTranslationX();
+            float y = column.getTranslationY();
 
             long now = SystemClock.uptimeMillis();
             after((now / BurnInGuard.SHIFT_EVERY_MS + 1) * BurnInGuard.SHIFT_EVERY_MS - now);
-            assertAt(content, step);
+            assertAt(column, step);
+            assertEquals(0f, content.getTranslationX(), 0f);
+            assertEquals(0f, content.getTranslationY(), 0f);
             assertTrue("the guard's own pass moved it",
-                    x != content.getTranslationX() || y != content.getTranslationY());
+                    x != column.getTranslationX() || y != column.getTranslationY());
             after(BurnInGuard.SHIFT_EVERY_MS);
-            assertAt(content, step);
+            assertAt(column, step);
+            assertEquals(0f, content.getTranslationX(), 0f);
+            assertEquals(0f, content.getTranslationY(), 0f);
 
             Settings.BURN_IN_GUARD.save(BurnInGuard.DIM);
             VideoOverlayHider.applyTo(activity);
-            assertEquals("without the shift the content goes back", 0f, content.getTranslationX(), 0f);
-            assertEquals(0f, content.getTranslationY(), 0f);
+            assertEquals("without the shift the controls go back", 0f, column.getTranslationX(), 0f);
+            assertEquals(0f, column.getTranslationY(), 0f);
         }
     }
 
