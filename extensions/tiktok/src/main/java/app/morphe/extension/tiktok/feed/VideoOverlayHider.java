@@ -121,6 +121,8 @@ public final class VideoOverlayHider {
      * the bar alone left a thin line across the bottom of each video until then (#84).
      */
     private static final String[] BOTTOM_TABS_DIVIDER_IDS = {"47.4.3:cnj"};
+    /** BaseAutoScrollUIComponent's floating icon and label live outside the video cells. */
+    private static final String[] AUTO_SCROLL_CONTROL_IDS = {"47.4.3:biv", "47.4.3:bj2"};
     /**
      * TikTok's loading line, the thin bar along the bottom of each video that grows from the
      * middle while it buffers. With the Clear display controls hidden it was the one bar left at
@@ -757,6 +759,7 @@ public final class VideoOverlayHider {
                     if (detailPager && detailCommentBar) noteColumnChildren(strips);
                     alignBarRows(found, TRAVERSAL.selected, hidden, cellId);
                     fadeFullscreenEntries();
+                    fadeAutoScrollControls(root);
                     int photoExit = TRAVERSAL.selected[CLEAR_PHOTO_EXIT_TARGET];
                     TapThroughControls.photoExits(activity, !clearControls && photoExit >= 0 ? found.get(photoExit) : null);
                     if (fadedClear && TapThroughControls.anyMarked()) TapThroughControls.watch(activity);
@@ -2067,6 +2070,19 @@ public final class VideoOverlayHider {
             setFaded(entry, gone ? 100 : fadeLevel, fadedClear);
             TapThroughControls.mark(entry, !gone && fadedClear);
             setHidden(entry, gone, View.INVISIBLE);
+        }
+    }
+
+    /** Fade only the native glyph and label; the host keeps ownership of scroll state/touches. */
+    private static void fadeAutoScrollControls(View root) {
+        if (root == null) return;
+        for (String name : AUTO_SCROLL_CONTROL_IDS) {
+            int id = RESOURCE_IDS.resolve(root.getResources(), root.getContext().getPackageName(), name, false);
+            if (id == 0) continue;
+            for (View control : viewsWithId(root, id)) {
+                // Respect TikTok's own hidden/clear alpha rather than bringing the control back.
+                setFaded(control, fadeLevel);
+            }
         }
     }
 
