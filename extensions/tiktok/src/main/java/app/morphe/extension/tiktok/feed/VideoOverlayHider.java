@@ -15,7 +15,6 @@ import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -747,7 +746,7 @@ public final class VideoOverlayHider {
                     // Before the guard, so it measures the caption where this pass leaves it.
                     int chin = (SeeThroughBottomBar.isSystemIndicatorActive(root) || clearOn()) ? 0 : SeeThroughBottomBar.getChinHeight(root.getContext());
                     int widgetLayerId = identifier(activity, activity.getPackageName(), WIDGET_LAYER_ID);
-                    liftWidgetLayers(root, strips, seeThroughBar, widgetLayerId, cellId, chin, activity);
+                    liftWidgetLayers(root, strips, seeThroughBar, widgetLayerId, cellId, chin);
                     guardBottomSpacer(hidden, found, TRAVERSAL.selected, seeThroughBar);
                     gateClearControls(hidden, found, TRAVERSAL.selected, carry);
                     applySelectedTargets(ids, hidden, found, TRAVERSAL.selected,
@@ -808,12 +807,6 @@ public final class VideoOverlayHider {
             }
             SeeThroughBottomBar.updateChinOverlay(activity);
 
-            boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity);
-            if (!detailPager && onFeed) {
-                ViewGroup content = activity.findViewById(android.R.id.content);
-                fillLiveFeedPreview(activity, content);
-            }
-
             try {
                 View shrinkScrim = activity.findViewById(0x7f0a78e4);
                 if (shrinkScrim != null) {
@@ -825,6 +818,7 @@ public final class VideoOverlayHider {
 
             setStatusBarHidden(activity, statusBar);
             // Only while the feed is in front: the window's other pages keep the color TikTok gives them.
+            boolean onFeed = FeedVisibility.isOnFeed(activity) || FeedVisibility.isCommentSheetVisible(activity);
             SeeThroughStatusBar.apply(activity, onFeed);
         } catch (Throwable ex) {
             Logger.printException(() -> "Video overlay hider failed", ex);
@@ -1407,19 +1401,6 @@ public final class VideoOverlayHider {
      * against the cell's bottom (S22, 2026-10-13: 2175 tall in a 2043 cell, bottom margin -132).
      */
     private static final String WIDGET_LAYER_ID = "widget_container";
-    /**
-     * Views and containers in LIVE preview feed cells that hold the creator / shop title and badges.
-     * When the system navigation bar is elevated (chin > 0), these are lifted to avoid being cut off.
-     */
-    private static final String[] LIVE_BOTTOM_CONTAINER_IDS = {
-        "47.4.3:ng2",
-        "tv_live_info_title",
-        "tv_icon_tag",
-        "ttlive_position_preview_mask_layout",
-        "unlive_info_container",
-        "ttlive_preview_subbanner_container",
-        "tv_live_title"
-    };
     /** Widget layers lifted over the see-through bar, with the offset written. */
     private static final Map<View, Float> WIDGETS_LIFTED = new WeakHashMap<>();
 
@@ -1428,20 +1409,19 @@ public final class VideoOverlayHider {
      * the main feed's pager the strip's room (#145), or elevates them when the system navigation
      * indicator is disabled so all bottom elements match the elevated bottom bar.
      */
-    private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar,
-            int layerId, int cellId, int chin, Activity activity) {
+    private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar, int layerId, int cellId, int chin) {
         List<View> lifted = new ArrayList<>();
-        float stripGained = 0f;
-        if (seeThroughBar && strips != null && !strips.isEmpty()) {
-            for (View strip : strips) {
-                float gained = roomGained(strip);
-                if (gained > stripGained) stripGained = gained;
+        if (layerId != 0) {
+            float stripGained = 0f;
+            if (seeThroughBar && strips != null && !strips.isEmpty()) {
+                for (View strip : strips) {
+                    float gained = roomGained(strip);
+                    if (gained > stripGained) stripGained = gained;
+                }
             }
-        }
-        float totalLift = stripGained + (float) chin;
-        if (totalLift > 0f) {
-            List<View> layers = new ArrayList<>();
-            if (layerId != 0) {
+            float totalLift = stripGained + (float) chin;
+            if (totalLift > 0f) {
+                List<View> layers = new ArrayList<>();
                 if (strips != null && !strips.isEmpty() && cellId != 0) {
                     for (View strip : strips) {
                         collectWidgetLayers((View) strip.getParent(), layerId, cellId, 0, layers);
@@ -1450,88 +1430,15 @@ public final class VideoOverlayHider {
                 if (layers.isEmpty() && root != null) {
                     layers.addAll(viewsWithId(root, layerId));
                 }
-            }
-            if (layers.isEmpty() && root != null && activity != null) {
-                collectLiveBottomLayers(root, activity, cellId, layers);
-            }
-            for (View layer : layers) {
-                offsetOwned(WIDGETS_LIFTED, layer, -totalLift);
-                lifted.add(layer);
+                for (View layer : layers) {
+                    offsetOwned(WIDGETS_LIFTED, layer, -totalLift);
+                    lifted.add(layer);
+                }
             }
         }
         if (WIDGETS_LIFTED.isEmpty()) return;
         for (View layer : new ArrayList<>(WIDGETS_LIFTED.keySet())) {
             if (!lifted.contains(layer)) offsetOwned(WIDGETS_LIFTED, layer, 0f);
-        }
-    }
-
-    private static void collectLiveBottomLayers(View root, Activity activity, int cellId, List<View> out) {
-        String packageName = activity.getPackageName();
-        for (String name : LIVE_BOTTOM_CONTAINER_IDS) {
-            int id = name.contains(":") ? resolveIdentifier(activity, packageName, name, false)
-                    : activity.getResources().getIdentifier(name, "id", packageName);
-            if (id == 0) continue;
-            List<View> views = viewsWithId(root, id);
-            for (View v : views) {
-                if (!v.isShown()) continue;
-                View target = v;
-                if (name.startsWith("tv_") || name.startsWith("ttlive_position_preview_mask_content")) {
-                    ViewParent p = v.getParent();
-                    while (p instanceof ViewGroup) {
-                        ViewGroup vg = (ViewGroup) p;
-                        if (vg.getId() == cellId || (root.getHeight() > 0 && vg.getHeight() >= root.getHeight() * 0.7f)) {
-                            break;
-                        }
-                        target = vg;
-                        p = vg.getParent();
-                    }
-                }
-                if (!out.contains(target)) {
-                    out.add(target);
-                }
-            }
-            if (!out.isEmpty()) break;
-        }
-    }
-
-    private static void fillLiveFeedPreview(Activity activity, ViewGroup root) {
-        if (root == null || activity == null) return;
-        View surface = SeeThroughStatusBar.findVisibleSurface(root);
-        if (surface == null) return;
-
-        // If this surface is inside a standard player_view, it was already handled by PLAYER_VIEW_TARGET
-        View current = surface;
-        while (current != null && current != root) {
-            if ("player_view".equals(SeeThroughStatusBar.getViewIdName(current))) {
-                return;
-            }
-            ViewParent p = current.getParent();
-            current = (p instanceof View) ? (View) p : null;
-        }
-
-        // Live preview cell surface: clear any top status-bar padding/margin offset on ancestors
-        int statusBarHeight = SeeThroughStatusBar.getStatusBarHeight(activity);
-        View cur = surface;
-        while (cur != null && cur != root) {
-            if (cur.getPaddingTop() > 0 && Math.abs(cur.getPaddingTop() - statusBarHeight) <= 12) {
-                cur.setPadding(cur.getPaddingLeft(), 0, cur.getPaddingRight(), cur.getPaddingBottom());
-            }
-            ViewGroup.LayoutParams lp = cur.getLayoutParams();
-            if (lp instanceof ViewGroup.MarginLayoutParams) {
-                ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) lp;
-                if (mlp.topMargin > 0 && Math.abs(mlp.topMargin - statusBarHeight) <= 12) {
-                    mlp.topMargin = 0;
-                    cur.setLayoutParams(mlp);
-                }
-            }
-            ViewParent p = cur.getParent();
-            cur = (p instanceof View) ? (View) p : null;
-        }
-
-        // Fill the live stream container to scale and shift to the status bar
-        View player = (surface instanceof ViewGroup) ? surface : (View) surface.getParent();
-        if (player instanceof ViewGroup) {
-            SeeThroughStatusBar.fill(player, true);
         }
     }
 
