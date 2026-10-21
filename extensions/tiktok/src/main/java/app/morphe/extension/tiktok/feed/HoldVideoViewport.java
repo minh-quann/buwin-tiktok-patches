@@ -50,16 +50,28 @@ public final class HoldVideoViewport {
         }
     }
 
-    static int[] size(View view, int width, int height) {
+    /** Also covers the release frame while native chrome/layout is still being restored. */
+    static boolean isHolding(View view) {
+        if (view == null) return false;
         View root = view.getRootView();
         Hold hold = HOLDS.get(root);
-        if (hold != null) {
-            View cell = hold.cell.get();
-            boolean valid = hold.owner.get() != null && cell != null && cell.isAttachedToWindow()
-                    // Preloaded cells also ask for a crop; they share this window's viewport
-                    // and must not cancel the visible cell's hold while binding off screen.
-                    && root.getWidth() == hold.windowWidth && root.getHeight() == hold.windowHeight;
-            if (!valid || (hold.released && width == hold.width && height == hold.height)) {
+        if (hold == null) return false;
+        View cell = hold.cell.get();
+        if (hold.owner.get() == null || cell == null || !cell.isAttachedToWindow()
+                || !SeeThroughStatusBar.wantsNativeFill(cell)
+                || root.getWidth() != hold.windowWidth || root.getHeight() != hold.windowHeight) {
+            HOLDS.remove(root);
+            return false;
+        }
+        return true;
+    }
+
+    static int[] size(View view, int width, int height) {
+        View root = view.getRootView();
+        if (isHolding(view)) {
+            Hold hold = HOLDS.get(root);
+            if (hold.released && width == hold.width && height == hold.height
+                    && NativeBottomBar.holdLayoutRestored(hold.cell.get())) {
                 HOLDS.remove(root);
             } else {
                 return new int[]{hold.width, hold.height};

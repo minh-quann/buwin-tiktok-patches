@@ -79,7 +79,7 @@ public final class NativeBottomBar {
 
     /** Registered by the native component itself, so host rebinds cannot flash the separator. */
     public static boolean prepareFrame(View bar) {
-        boolean active = enabled() && bar.isShown();
+        boolean active = enabled() && (bar.isShown() || HoldVideoViewport.isHolding(bar));
         boolean changed = false;
         // Sibling cells can reuse their measure cache when only the tab bar changes. Restore
         // or reapply their owned margins before this frame, including a navigation-mode change.
@@ -102,7 +102,7 @@ public final class NativeBottomBar {
     }
 
     private static int reserve(View bar) {
-        return enabled() && bar != null && bar.getVisibility() == View.VISIBLE
+        return enabled() && bar != null && (bar.getVisibility() == View.VISIBLE || HoldVideoViewport.isHolding(bar))
                 && !SeeThroughBottomBar.isSystemIndicatorActive(bar)
                 ? SeeThroughBottomBar.getChinHeight(bar.getContext()) : 0;
     }
@@ -133,10 +133,19 @@ public final class NativeBottomBar {
         if (!(view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return false;
         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
         int[] held = MARGINS.get(view);
-        // A host rebind can replace either margin. Adopt its new base rather than adding twice.
-        int top = held != null && params.topMargin == held[0] - held[2] ? held[0] : params.topMargin;
-        int bottom = held != null && params.bottomMargin == held[1] + held[2] ? held[1] : params.bottomMargin;
-        MARGINS.put(view, new int[]{top, bottom, lift});
+        int top, bottom;
+        if (held != null && HoldVideoViewport.isHolding(view)) {
+            // Keep the pre-gesture native margins. A taller parent must not push a bottom-
+            // anchored caption down when the host temporarily removes its bottom strip.
+            top = held[0]; bottom = held[1];
+            lift = held[4] + parentHeight(view) - held[3];
+            held[2] = lift;
+        } else {
+            // A normal host rebind may replace either base margin; never add our lift twice.
+            top = held != null && params.topMargin == held[0] - held[2] ? held[0] : params.topMargin;
+            bottom = held != null && params.bottomMargin == held[1] + held[2] ? held[1] : params.bottomMargin;
+            MARGINS.put(view, new int[]{top, bottom, lift, parentHeight(view), lift});
+        }
         if (params.topMargin != top - lift || params.bottomMargin != bottom + lift) {
             params.topMargin = top - lift;
             params.bottomMargin = bottom + lift;
@@ -157,23 +166,52 @@ public final class NativeBottomBar {
         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) seek.getLayoutParams();
         int[] held = SEEK_MARGINS.get(seek);
         int base = held != null && params.bottomMargin == held[1] ? held[0] : params.bottomMargin;
-        if (!enabled() || bar.getVisibility() != View.VISIBLE) {
-            SEEK_MARGINS.remove(seek);
-            if (held == null || params.bottomMargin != held[1] || params.bottomMargin == base) return false;
-            params.bottomMargin = base;
-            seek.setLayoutParams(params);
-            return true;
-        }
-        int row = bar.getLayoutParams().height;
-        if (row <= 0) return false;
         int seekHeight = params.height > 0 ? params.height : seek.getMeasuredHeight();
-        // The seek track is at the centre of its native touch target. Keep it one pixel above
-        // the bar's actual top, even when TikTok changes the target from 18dp to 28dp.
-        int margin = row + reserve(bar) - seekHeight / 2 + 1;
-        SEEK_MARGINS.put(seek, new int[]{base, margin});
+        int margin;
+        if (enabled() && held != null && HoldVideoViewport.isHolding(mask)) {
+            // Preserve the TRACK centre even if the native drag touch target changes height.
+            margin = held[2] - seekHeight / 2 + parentHeight(seek) - held[3];
+            held[1] = margin;
+        } else {
+            if (!enabled() || bar.getVisibility() != View.VISIBLE) {
+                SEEK_MARGINS.remove(seek);
+                if (held == null || params.bottomMargin != held[1] || params.bottomMargin == base) return false;
+                params.bottomMargin = base;
+                seek.setLayoutParams(params);
+                return true;
+            }
+            int row = bar.getLayoutParams().height;
+            if (row <= 0) return false;
+            // The track stays one pixel above the native bottom-tabs boundary.
+            margin = row + reserve(bar) - seekHeight / 2 + 1;
+            SEEK_MARGINS.put(seek, new int[]{base, margin, margin + seekHeight / 2, parentHeight(seek)});
+        }
         if (params.bottomMargin == margin) return false;
         params.bottomMargin = margin;
         seek.setLayoutParams(params);
+        return true;
+    }
+
+    private static int parentHeight(View view) {
+        if (!(view.getParent() instanceof View)) return 0;
+        View parent = (View) view.getParent();
+        return parent.getMeasuredHeight() > 0 ? parent.getMeasuredHeight() : parent.getHeight();
+    }
+
+    /** Do not unlock on the frame tabs return before the widget/seek parents finish layout. */
+    static boolean holdLayoutRestored(View cell) {
+        if (cell == null) return true;
+        for (Map.Entry<View, int[]> entry : MARGINS.entrySet()) {
+            View view = entry.getKey();
+            View at = view;
+            while (at != null && at != cell) at = at.getParent() instanceof View ? (View) at.getParent() : null;
+            if (at == cell && view.isAttachedToWindow() && parentHeight(view) != entry.getValue()[3]) return false;
+        }
+        for (Map.Entry<View, int[]> entry : SEEK_MARGINS.entrySet()) {
+            View view = entry.getKey();
+            if (view.getRootView() == cell.getRootView() && view.isAttachedToWindow()
+                    && parentHeight(view) != entry.getValue()[3]) return false;
+        }
         return true;
     }
 

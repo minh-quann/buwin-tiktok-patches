@@ -758,7 +758,7 @@ public final class VideoOverlayHider {
                     collapseRailWrappers(activity, found, TRAVERSAL.selected, hidden);
                     settleStripColumns(strips);
                     if (detailPager && detailCommentBar) noteColumnChildren(strips);
-                    alignBarRows(found, TRAVERSAL.selected, hidden, cellId);
+                    alignBarRows(found, TRAVERSAL.selected, hidden, cellId, root);
                     fadeFullscreenEntries();
                     fadeAutoScrollControls(root);
                     int photoExit = TRAVERSAL.selected[CLEAR_PHOTO_EXIT_TARGET];
@@ -1282,7 +1282,8 @@ public final class VideoOverlayHider {
      * needs no lift. Both go back with the bar, and a row or frame TikTok moved itself since is
      * left to TikTok.
      */
-    private static void alignBarRows(List<List<View>> found, int[] selected, boolean[] hidden, int cellId) {
+    private static void alignBarRows(List<List<View>> found, int[] selected, boolean[] hidden, int cellId, View root) {
+        if (HoldVideoViewport.isHolding(root)) return;
         int rowsAt = selected[CLEAR_SEEK_BAR_TARGET];
         List<View> rows = rowsAt >= 0 ? found.get(rowsAt) : new ArrayList<>();
         boolean barGone = selected[DETAIL_COMMENT_STRIP_TARGET] >= 0
@@ -1409,6 +1410,7 @@ public final class VideoOverlayHider {
      * separately reserve the extra space owned by its bottom-tabs component.
      */
     private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar, int layerId, int cellId) {
+        if (HoldVideoViewport.isHolding(root)) return;
         List<View> lifted = new ArrayList<>();
         if (layerId != 0) {
             float stripGained = 0f;

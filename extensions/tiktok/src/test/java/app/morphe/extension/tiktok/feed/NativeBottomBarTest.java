@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.TextView;
+import app.morphe.extension.tiktok.cleardisplay.RememberClearDisplayPatch;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
@@ -241,6 +243,89 @@ public class NativeBottomBarTest {
             assertEquals(0, widgetParams.topMargin);
             assertEquals(-152, widgetParams.bottomMargin);
         }
+    }
+
+    @Test public void holdKeepsCaptionAndSeekPixelsWhenTabsHideAndNativeParentsReflow() throws Exception {
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
+            FrameLayout mask = new FrameLayout(controller.get());
+            controller.get().setContentView(mask);
+            app.morphe.extension.tiktok.settings.Settings.FIT_VIDEO_TO_SCREEN.save(false);
+            app.morphe.extension.tiktok.settings.Settings.STATUS_BAR_STYLE.save(
+                    app.morphe.extension.tiktok.settings.Settings.STATUS_BAR_STYLE_SCALE);
+            FrameLayout cell = new FrameLayout(mask.getContext());
+            mask.addView(cell, new FrameLayout.LayoutParams(1320, 2710));
+            FrameLayout widgets = new FrameLayout(mask.getContext());
+            widgets.setId(0x7f0aa089);
+            FrameLayout.LayoutParams widgetParams = new FrameLayout.LayoutParams(1320, 2862, Gravity.BOTTOM);
+            widgetParams.bottomMargin = -152;
+            cell.addView(widgets, widgetParams);
+            TextView title = new TextView(mask.getContext()), description = new TextView(mask.getContext());
+            title.setText("Video title"); description.setText("Video description");
+            FrameLayout.LayoutParams titleSlot = new FrameLayout.LayoutParams(800, 60, Gravity.BOTTOM);
+            titleSlot.bottomMargin = 200;
+            FrameLayout.LayoutParams descriptionSlot = new FrameLayout.LayoutParams(800, 100, Gravity.BOTTOM);
+            descriptionSlot.bottomMargin = 100;
+            widgets.addView(title, titleSlot); widgets.addView(description, descriptionSlot);
+            View gesture = new View(mask.getContext());
+            cell.addView(gesture, new FrameLayout.LayoutParams(10, 10));
+            Tabs bar = tabs(mask);
+            bar.setId(0x7f0a4ecc); bar.getLayoutParams().height = 158;
+            View seek = new View(mask.getContext()); seek.setId(0x7f0a9cc5);
+            mask.addView(seek, new FrameLayout.LayoutParams(1320, 90, Gravity.BOTTOM));
+            String pkg = mask.getContext().getPackageName();
+            cache().putForTests(pkg, "47.4.3:onp", bar.getId());
+            cache().putForTests(pkg, "widget_container", widgets.getId());
+            cache().putForTests(pkg, "video_seek_bar", seek.getId());
+            for (int i = 0; i < 3; i++) {
+                NativeBottomBar.measureCell(cell); NativeBottomBar.measureFeed(mask);
+                layoutHonor(mask); NativeBottomBar.prepareFrame(bar);
+            }
+            layoutHonor(mask);
+            int titleY = widgets.getTop() + title.getTop();
+            int descriptionY = widgets.getTop() + description.getTop();
+            int seekY = seek.getTop() + seek.getHeight() / 2;
+            HoldVideoViewportTest.Edge owner = new HoldVideoViewportTest.Edge(gesture);
+            HoldVideoViewport.begin(owner);
+            assertTrue(HoldVideoViewport.isHolding(mask));
+            bar.setVisibility(View.GONE);
+            RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(true, 0));
+            cell.getLayoutParams().height = 2868;
+            seek.getLayoutParams().height = 160;
+            ((FrameLayout.LayoutParams) seek.getLayoutParams()).bottomMargin = 0;
+            widgetParams.topMargin = 0; widgetParams.bottomMargin = -152;
+            layoutHonor(mask);
+            // Native pre-draw cancels this reflow before a displaced caption can be drawn.
+            assertFalse(NativeBottomBar.prepareFrame(bar));
+            NativeBottomBar.measureCell(cell); NativeBottomBar.measureFeed(mask); layoutHonor(mask);
+            assertEquals(titleY, widgets.getTop() + title.getTop());
+            assertEquals(descriptionY, widgets.getTop() + description.getTop());
+            assertEquals(seekY, seek.getTop() + seek.getHeight() / 2);
+            assertTrue(NativeBottomBar.prepareFrame(bar));
+            HoldVideoViewport.end(owner);
+            bar.setVisibility(View.VISIBLE);
+            RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(false, 2));
+            SeeThroughStatusBar.nativeFillViewport(gesture);
+            assertTrue("tabs alone returning must not unlock the still-expanded widget parent", HoldVideoViewport.isHolding(mask));
+            assertEquals(titleY, widgets.getTop() + title.getTop());
+            cell.getLayoutParams().height = 2710;
+            seek.getLayoutParams().height = 90;
+            layoutHonor(mask);
+            SeeThroughStatusBar.nativeFillViewport(gesture);
+            assertFalse(HoldVideoViewport.isHolding(mask));
+            NativeBottomBar.prepareFrame(bar);
+            NativeBottomBar.measureCell(cell); NativeBottomBar.measureFeed(mask); layoutHonor(mask);
+            assertEquals(titleY, widgets.getTop() + title.getTop());
+            assertEquals(descriptionY, widgets.getTop() + description.getTop());
+            assertEquals(seekY, seek.getTop() + seek.getHeight() / 2);
+        } finally {
+            RememberClearDisplayPatch.rememberClearDisplayEvent(new VideoOverlayHiderTest.ClearEvent(false, 2));
+        }
+    }
+
+    private void layoutHonor(View root) {
+        root.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
+        root.layout(0, 0, 1320, 2868);
     }
 
 }
