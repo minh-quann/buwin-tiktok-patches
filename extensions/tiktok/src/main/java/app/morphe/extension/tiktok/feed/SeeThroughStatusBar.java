@@ -264,6 +264,45 @@ public final class SeeThroughStatusBar {
         return best;
     }
 
+    /**
+     * Finds the primary visible video SurfaceView or TextureView crossing the vertical center of the screen.
+     * Essential on feed where offscreen cells may also retain SurfaceViews in memory.
+     */
+    public static View findVisibleSurface(View root) {
+        if (root == null) return null;
+        int screenH = root.getResources().getDisplayMetrics().heightPixels;
+        int middle = root.getRootView() != null && root.getRootView().getHeight() > 0
+                ? root.getRootView().getHeight() / 2 : screenH / 2;
+        int[] at = new int[2];
+        java.util.ArrayDeque<View> queue = new java.util.ArrayDeque<>();
+        queue.add(root);
+        View best = null;
+        long bestArea = 0;
+        int visited = 0;
+        while (!queue.isEmpty() && visited++ < 400) {
+            View v = queue.poll();
+            if (v == null || v.getVisibility() != View.VISIBLE) continue;
+            if (v instanceof SurfaceView || v instanceof TextureView) {
+                if (v.isShown() && v.getWidth() > 0 && v.getHeight() > 0) {
+                    v.getLocationInWindow(at);
+                    if (at[1] <= middle && at[1] + v.getHeight() >= middle) {
+                        long area = (long) v.getWidth() * (long) v.getHeight();
+                        if (area > bestArea) {
+                            bestArea = area;
+                            best = v;
+                        }
+                    }
+                }
+            } else if (v instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) v;
+                for (int i = 0, count = vg.getChildCount(); i < count; i++) {
+                    queue.add(vg.getChildAt(i));
+                }
+            }
+        }
+        return best;
+    }
+
     /** Finds the root view of the feed cell (view_rootview) or topmost laid-out ancestor. */
     static View findCellRoot(View view) {
         View current = view;
@@ -285,7 +324,7 @@ public final class SeeThroughStatusBar {
         return best;
     }
 
-    private static String getViewIdName(View v) {
+    static String getViewIdName(View v) {
         try {
             if (v.getId() > 0 && v.getResources() != null) {
                 return v.getResources().getResourceEntryName(v.getId());
@@ -420,7 +459,7 @@ public final class SeeThroughStatusBar {
             if (cellWidth <= 0) cellWidth = player.getResources().getDisplayMetrics().widthPixels;
 
             if (vWidth > 0 && vHeight > 0) {
-                unclipAncestors(targetView, clearDisplay ? null : cell);
+                unclipAncestors(targetView, null);
                 if (cell != null) {
                     try {
                         View shrinkScrim = cell.findViewById(0x7f0a78e4);
