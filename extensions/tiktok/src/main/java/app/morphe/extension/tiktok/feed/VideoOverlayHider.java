@@ -553,10 +553,6 @@ public final class VideoOverlayHider {
             // Swipe for brightness and volume wraps the window once, and gives the brightness
             // back on this pass when its switch goes off or Buwin is paused.
             EdgeSwipeLevels.sync(activity);
-            // Reserve space before traversing children. A new measure must settle before
-            // player transforms use cell dimensions from the previous layout.
-            if (FeedBottomInset.apply(activity, !BuwinPause.isPaused()
-                    && SettingsStatus.videoOverlaysEnabled)) return;
             // The names above the feed follow their own switch on the strip TikTok's tab filter
             // hides; this pass is the one thing that runs on every layout, so it carries the ask.
             NavigationTabsFilter.refreshTopTabStrips();
@@ -803,12 +799,6 @@ public final class VideoOverlayHider {
             }
             ClearDisplayShownControls.apply(fadedClear, clearOn());
             ProfileTopBar.apply(activity.findViewById(android.R.id.content));
-            if (!detailPager) {
-                View bottomBar = view(activity, activity.getPackageName(), BOTTOM_TABS_IDS);
-                if (bottomBar != null) {
-                    SeeThroughBottomBar.adjustBottomBarChin(bottomBar);
-                }
-            }
 
             try {
                 View shrinkScrim = activity.findViewById(0x7f0a78e4);
@@ -1989,11 +1979,8 @@ public final class VideoOverlayHider {
                         // its hairline goes see-through, while the tabs keep their icons and the
                         // fade. Clear display still takes the bar away whole.
                         boolean clearBar = seeThroughBarNow && !wanted;
-                        // Floating bottom bar draws a rounded pill there instead (#124).
-                        if (target == BOTTOM_TABS_TARGET) {
-                            SeeThroughBottomBar.adjustBottomBarChin(view);
-                            SeeThroughBottomBar.setBackgroundClear(view, clearBar, floatingBarNow);
-                        }
+                        // The original component owns its background and bottom reserve through
+                        // NativeBottomBar's measure/draw hooks. This traversal only fades tabs.
                         if (target == BOTTOM_TABS_DIVIDER_TARGET && clearBar) {
                             setFaded(view, 100);
                             setTransparent(view, true);

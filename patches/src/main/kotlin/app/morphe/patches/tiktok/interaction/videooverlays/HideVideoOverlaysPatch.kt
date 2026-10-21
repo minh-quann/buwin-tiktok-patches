@@ -61,6 +61,7 @@ val hideVideoOverlaysPatch = bytecodePatch(
     compatibleWith(*AppCompatibilities.tiktok())
 
     execute {
+        val nativeBottomBar = resolveNativeBottomBar()
         val status = SettingsStatusLoadFingerprint.method
         val activity = MainActivityOnCreateFingerprint.method
         val detail = DetailActivityOnCreateFingerprint.method
@@ -107,6 +108,7 @@ val hideVideoOverlaysPatch = bytecodePatch(
             null
         }
         // A missing new control must not leave an otherwise failed patch partly applied.
+        nativeBottomBar()
         controls()
         badgeList()
         // The regional Report button above the creator's avatar (issue #21). Answering false is
