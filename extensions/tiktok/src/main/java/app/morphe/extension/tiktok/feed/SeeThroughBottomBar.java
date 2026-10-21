@@ -13,14 +13,9 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
-import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.Window;
 import android.view.WindowInsets;
-import android.widget.FrameLayout;
 
-import app.morphe.extension.tiktok.blockauthor.FeedVisibility;
 import app.morphe.extension.tiktok.settings.preference.SettingsUi;
 
 import java.util.List;
@@ -87,10 +82,6 @@ final class SeeThroughBottomBar {
 
     /** Bars whose background this class replaced, with the drawable each had. */
     private static final Map<View, Drawable> BACKGROUNDS = new WeakHashMap<>();
-
-    /** Original heights and bottom paddings of views adjusted for chin. */
-    private static final Map<View, Integer> ORIGINAL_BAR_HEIGHT = new WeakHashMap<>();
-    private static final Map<View, Integer> ORIGINAL_BAR_PADDING_BOTTOM = new WeakHashMap<>();
 
     /**
      * Overlays (the caption frame, the buttons' column) measured with the spacer in place: true
@@ -170,154 +161,21 @@ final class SeeThroughBottomBar {
 
     private static java.lang.ref.WeakReference<View> bottomBarRef = new java.lang.ref.WeakReference<>(null);
 
-    static int getTotalBarHeight(Context context) {
+    /** Bottom tabs in the cell's coordinates, without guessed heights or another window's bar. */
+    static int getBottomBarTop(View cell, int fullHeight) {
         View bar = bottomBarRef.get();
-        if (bar != null && bar.getHeight() > 0) {
-            return bar.getHeight();
-        }
-        if (context == null) return 0;
-        float density = context.getResources().getDisplayMetrics().density;
-        int origH = Math.round(54 * density);
-        boolean indicatorActive = isSystemIndicatorActive(bar);
-        int chin = indicatorActive ? 0 : getChinHeight(context);
-        return origH + chin;
+        if (cell == null || bar == null || bar.getRootView() != cell.getRootView()
+                || bar.getHeight() <= 0 || !bar.isShown()) return fullHeight;
+        int top = Math.round(topInWindow(bar) - topInWindow(cell));
+        return top > 0 && top < fullHeight ? top : fullHeight;
     }
 
-    /** Returns the Y coordinate where the bottom bar begins on screen, or fallback. */
-    static int getBottomBarTop(View contextView, int fullHeight) {
-        View bar = bottomBarRef.get();
-        if (bar != null && bar.getHeight() > 0 && bar.isShown()) {
-            int top = bar.getTop();
-            if (top > 0 && top < fullHeight) {
-                return top;
-            }
-            int h = bar.getHeight();
-            if (h > 0 && h < fullHeight) {
-                return fullHeight - h;
-            }
-        }
-        Context ctx = contextView != null ? contextView.getContext() : null;
-        int totalH = getTotalBarHeight(ctx);
-        if (totalH > 0 && totalH < fullHeight) {
-            return fullHeight - totalH;
-        }
-        return fullHeight;
-    }
-
-    /**
-     * Adjusts the bottom bar's height and bottom padding:
-     * - When system indicator is disabled: adds the chin height so the bar is comfortably elevated
-     *   and leaves a solid black border at the bottom edge of the screen (matching iOS).
-     * - When system indicator is enabled: does not add chin.
-     * - Always ensures the entire bottom bar (including bottom chin) is solid black like iOS.
-     */
+    /** Keeps the native tab geometry; the Activity content root owns the bottom reserve. */
     static void adjustBottomBarChin(View bar) {
         if (bar == null) return;
         bottomBarRef = new java.lang.ref.WeakReference<>(bar);
-        boolean indicatorActive = isSystemIndicatorActive(bar);
-        int chin = indicatorActive ? 0 : getChinHeight(bar.getContext());
-
-        ViewGroup.LayoutParams lp = bar.getLayoutParams();
-        if (lp != null) {
-            Integer origH = ORIGINAL_BAR_HEIGHT.get(bar);
-            if (origH == null) {
-                origH = lp.height > 0 ? lp.height : bar.getHeight();
-                if (origH > 0) ORIGINAL_BAR_HEIGHT.put(bar, origH);
-            }
-            if (origH != null && origH > 0) {
-                int targetH = origH + chin;
-                if (lp.height != targetH) {
-                    lp.height = targetH;
-                    bar.setLayoutParams(lp);
-                }
-            }
-        }
-
-        Integer origPad = ORIGINAL_BAR_PADDING_BOTTOM.get(bar);
-        if (origPad == null) {
-            origPad = bar.getPaddingBottom();
-            ORIGINAL_BAR_PADDING_BOTTOM.put(bar, origPad);
-        }
-        int targetPad = origPad + chin;
-        if (bar.getPaddingBottom() != targetPad) {
-            bar.setPadding(bar.getPaddingLeft(), bar.getPaddingTop(), bar.getPaddingRight(), targetPad);
-        }
-
-        // Entire bottom bar (including bottom chin) is solid black like iOS
         bar.setBackgroundColor(Color.BLACK);
     }
-
-    private static final String BLACK_CHIN_TAG = "buwin_black_chin_overlay";
-
-    /**
-     * Ensures a solid black chin is painted at the bottom edge of the screen when the system
-     * navigation indicator is disabled ("bôi đen mép dưới màn hình"), preventing the next video
-     * in ViewPager from peeking through underneath the elevated bottom bar or during clear display.
-     * Attached strictly to MainActivity's decorView and only visible while actively on the feed.
-     */
-    static void updateChinOverlay(Activity activity) {
-        if (activity == null || activity.isFinishing()) return;
-        if (!activity.getClass().getSimpleName().contains("MainActivity")) return;
-
-        Window window = activity.getWindow();
-        if (window == null) return;
-        View decor = window.getDecorView();
-        if (!(decor instanceof ViewGroup)) return;
-        ViewGroup root = (ViewGroup) decor;
-
-        boolean indicatorActive = isSystemIndicatorActive(root);
-        int chin = indicatorActive ? 0 : getChinHeight(activity);
-
-        boolean shouldShow = (chin > 0)
-                && FeedVisibility.isOnFeed(activity)
-                && !FeedVisibility.isCommentSheetVisible(activity);
-
-        View chinView = root.findViewWithTag(BLACK_CHIN_TAG);
-        if (!shouldShow) {
-            if (chinView != null && chinView.getVisibility() != View.GONE) {
-                chinView.setVisibility(View.GONE);
-            }
-            return;
-        }
-
-        if (chinView == null) {
-            chinView = new View(activity);
-            chinView.setTag(BLACK_CHIN_TAG);
-            chinView.setBackgroundColor(Color.BLACK);
-            chinView.setClickable(false);
-            chinView.setFocusable(false);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, chin, Gravity.BOTTOM);
-            root.addView(chinView, lp);
-        } else {
-            ViewGroup.LayoutParams lp = chinView.getLayoutParams();
-            if (lp != null && lp.height != chin) {
-                lp.height = chin;
-                chinView.setLayoutParams(lp);
-            }
-            if (chinView.getVisibility() != View.VISIBLE) {
-                chinView.setVisibility(View.VISIBLE);
-            }
-        }
-        chinView.bringToFront();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            chinView.setElevation(9999f);
-        }
-    }
-
-    /**
-     * Cleans up any leftover chin view that was previously attached to cell.
-     */
-    static void updateCellChin(View cell, int chin) {
-        if (!(cell instanceof ViewGroup)) return;
-        ViewGroup cellGroup = (ViewGroup) cell;
-        View chinView = cellGroup.findViewWithTag(BLACK_CHIN_TAG);
-        if (chinView != null) {
-            cellGroup.removeView(chinView);
-        }
-    }
-
-
 
     /** Whether the spacer under the video may be collapsed. */
     static boolean collapseAllowed() {

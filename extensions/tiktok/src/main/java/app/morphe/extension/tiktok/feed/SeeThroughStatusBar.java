@@ -332,6 +332,7 @@ public final class SeeThroughStatusBar {
         ViewParent p = view.getParent();
         while (p instanceof ViewGroup) {
             ViewGroup vg = (ViewGroup) p;
+            if (vg.getId() == android.R.id.content) break;
             if (vg.getClipChildren()) {
                 vg.setClipChildren(false);
             }
@@ -389,25 +390,17 @@ public final class SeeThroughStatusBar {
             fullHeight = player.getResources().getDisplayMetrics().heightPixels;
         }
 
-        boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(player);
-        int chin = indicatorActive ? 0 : SeeThroughBottomBar.getChinHeight(player.getContext());
-
         boolean clearDisplay = RememberClearDisplayPatch.isClearDisplayNow()
                 || RememberClearDisplayPatch.isCarryingClear();
 
         int targetHeight;
         if (clearDisplay) {
-            targetHeight = fullHeight - chin;
+            targetHeight = fullHeight;
         } else {
-            int barTop = SeeThroughBottomBar.getBottomBarTop(player, fullHeight);
-            targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : (fullHeight - chin);
+            int barTop = SeeThroughBottomBar.getBottomBarTop(cell != null ? cell : player, fullHeight);
+            targetHeight = (barTop > 0 && barTop < fullHeight) ? barTop : fullHeight;
         }
         if (targetHeight <= 0) targetHeight = fullHeight;
-
-        // Clean up any legacy cell chin so it never obstructs video content
-        if (cell != null) {
-            SeeThroughBottomBar.updateCellChin(cell, 0);
-        }
 
         if (doScale) {
             // Scale mode: center and aspect fill from y=0 to targetHeight (meeting the solid black bottom bar)

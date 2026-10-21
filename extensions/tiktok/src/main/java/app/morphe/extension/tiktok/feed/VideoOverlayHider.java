@@ -553,6 +553,10 @@ public final class VideoOverlayHider {
             // Swipe for brightness and volume wraps the window once, and gives the brightness
             // back on this pass when its switch goes off or Buwin is paused.
             EdgeSwipeLevels.sync(activity);
+            // Reserve space before traversing children. A new measure must settle before
+            // player transforms use cell dimensions from the previous layout.
+            if (FeedBottomInset.apply(activity, !BuwinPause.isPaused()
+                    && SettingsStatus.videoOverlaysEnabled)) return;
             // The names above the feed follow their own switch on the strip TikTok's tab filter
             // hides; this pass is the one thing that runs on every layout, so it carries the ask.
             NavigationTabsFilter.refreshTopTabStrips();
@@ -744,9 +748,8 @@ public final class VideoOverlayHider {
                     pairDetailCommentBar(hidden, TRAVERSAL.selected, ids, detailPager, stripForBar);
                     List<View> strips = selectedViews(found, TRAVERSAL.selected, DETAIL_COMMENT_STRIP_TARGET);
                     // Before the guard, so it measures the caption where this pass leaves it.
-                    int chin = (SeeThroughBottomBar.isSystemIndicatorActive(root) || clearOn()) ? 0 : SeeThroughBottomBar.getChinHeight(root.getContext());
                     int widgetLayerId = identifier(activity, activity.getPackageName(), WIDGET_LAYER_ID);
-                    liftWidgetLayers(root, strips, seeThroughBar, widgetLayerId, cellId, chin);
+                    liftWidgetLayers(root, strips, seeThroughBar, widgetLayerId, cellId);
                     guardBottomSpacer(hidden, found, TRAVERSAL.selected, seeThroughBar);
                     gateClearControls(hidden, found, TRAVERSAL.selected, carry);
                     applySelectedTargets(ids, hidden, found, TRAVERSAL.selected,
@@ -805,7 +808,6 @@ public final class VideoOverlayHider {
                     SeeThroughBottomBar.adjustBottomBarChin(bottomBar);
                 }
             }
-            SeeThroughBottomBar.updateChinOverlay(activity);
 
             try {
                 View shrinkScrim = activity.findViewById(0x7f0a78e4);
@@ -1406,10 +1408,10 @@ public final class VideoOverlayHider {
 
     /**
      * Keeps the caption and the buttons where TikTok had them once See-through bottom bar gives
-     * the main feed's pager the strip's room (#145), or elevates them when the system navigation
-     * indicator is disabled so all bottom elements match the elevated bottom bar.
+     * the main feed's pager the strip's room (#145). Bottom safe space is already
+     * accounted for by the content root's measured bounds.
      */
-    private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar, int layerId, int cellId, int chin) {
+    private static void liftWidgetLayers(View root, List<View> strips, boolean seeThroughBar, int layerId, int cellId) {
         List<View> lifted = new ArrayList<>();
         if (layerId != 0) {
             float stripGained = 0f;
@@ -1419,7 +1421,7 @@ public final class VideoOverlayHider {
                     if (gained > stripGained) stripGained = gained;
                 }
             }
-            float totalLift = stripGained + (float) chin;
+            float totalLift = stripGained;
             if (totalLift > 0f) {
                 List<View> layers = new ArrayList<>();
                 if (strips != null && !strips.isEmpty() && cellId != 0) {
@@ -1938,12 +1940,6 @@ public final class VideoOverlayHider {
                             setTransparent(view, false);
                             setFaded(view, fadeLevel, fadedClear);
                         }
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view)
-                                ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                        float targetY = -chin;
-                        if (view.getTranslationY() != targetY) {
-                            view.setTranslationY(targetY);
-                        }
                     } else if (target == TOP_SEARCH_BAR_TARGET || target == TOP_SEARCH_SCRIM_TARGET) {
                         // The way back out of the page: faded like the tabs, never past the floor,
                         // and out of sight only until TikTok's own clear lands on the page.
@@ -1958,21 +1954,10 @@ public final class VideoOverlayHider {
                         setFaded(view, wanted ? 100 : fadeLevel, fadedClear && !wanted);
                         TapThroughControls.mark(view, !wanted && fadedClear);
                         setHidden(view, wanted);
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                        float targetY = -chin;
-                        if (view.getTranslationY() != targetY) {
-                            view.setTranslationY(targetY);
-                        }
                     } else if (target == LOADING_LINE_TARGET) {
                         android.view.ViewParent frame = view.getParent();
                         View targetView = frame instanceof View ? (View) frame : view;
                         setTransparent(targetView, wanted);
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view)
-                                ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                        float targetY = -chin;
-                        if (view.getTranslationY() != targetY) {
-                            view.setTranslationY(targetY);
-                        }
                         if (targetView != view && targetView.getTranslationY() != 0f) {
                             targetView.setTranslationY(0f);
                         }
@@ -1985,14 +1970,6 @@ public final class VideoOverlayHider {
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone, View.INVISIBLE);
-                        if (WIDGETS_LIFTED.isEmpty()) {
-                            int chin = (SeeThroughBottomBar.isSystemIndicatorActive(view) || clearOn())
-                                    ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                            float targetY = -chin;
-                            if (view.getTranslationY() != targetY) {
-                                view.setTranslationY(targetY);
-                            }
-                        }
                     } else if (target == ACTION_BAR_TARGET) {
                         // The rail's column. Fully faded it goes the way Clear display takes it,
                         // so nothing invisible takes a tap.
@@ -2000,14 +1977,6 @@ public final class VideoOverlayHider {
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone);
-                        if (WIDGETS_LIFTED.isEmpty()) {
-                            int chin = (SeeThroughBottomBar.isSystemIndicatorActive(view) || clearOn())
-                                    ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                            float targetY = -chin;
-                            if (view.getTranslationY() != targetY) {
-                                view.setTranslationY(targetY);
-                            }
-                        }
                     } else if (target >= RAIL_TARGET_START && target < STATUS_BAR_SPACER_TARGET) {
                         boolean gone = wanted || fadeLevel == 0;
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
@@ -2030,13 +1999,7 @@ public final class VideoOverlayHider {
                             continue;
                         }
                         if (target == BOTTOM_TABS_DIVIDER_TARGET) setTransparent(view, false);
-                        if (target == BOTTOM_TABS_DIVIDER_TARGET) {
-                            int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                            float targetY = -chin;
-                            if (view.getTranslationY() != targetY) {
-                                view.setTranslationY(targetY);
-                            }
-                        } else if (target == BOTTOM_TABS_TARGET) {
+                        if (target == BOTTOM_TABS_TARGET) {
                             if (view.getTranslationY() != 0f) {
                                 view.setTranslationY(0f);
                             }
@@ -2064,30 +2027,10 @@ public final class VideoOverlayHider {
                         setHidden(view, wanted);
                     } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET
                             || target == CLEAR_PHOTO_EXIT_TARGET) {
-                        boolean indicatorActive = SeeThroughBottomBar.isSystemIndicatorActive(view);
-                        float density = view.getResources().getDisplayMetrics().density;
-                        int lift = indicatorActive ? 0 : Math.round(6.5f * density);
-                        float targetY = -lift;
-                        if (view.getTranslationY() != targetY) {
-                            view.setTranslationY(targetY);
-                        }
                         setHidden(view, wanted);
                     } else if (target == DETAIL_COMMENT_STRIP_TARGET) {
-                        int chin = SeeThroughBottomBar.isSystemIndicatorActive(view) ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                        float targetY = -chin;
-                        if (view.getTranslationY() != targetY) {
-                            view.setTranslationY(targetY);
-                        }
                         setHidden(view, wanted);
                     } else {
-                        if ((target == CAPTION_TARGET || target == MUSIC_TARGET) && WIDGETS_LIFTED.isEmpty()) {
-                            int chin = (SeeThroughBottomBar.isSystemIndicatorActive(view) || clearOn())
-                                    ? 0 : SeeThroughBottomBar.getChinHeight(view.getContext());
-                            float targetY = -chin;
-                            if (view.getTranslationY() != targetY) {
-                                view.setTranslationY(targetY);
-                            }
-                        }
                         setHidden(view, wanted);
                     }
                 }
