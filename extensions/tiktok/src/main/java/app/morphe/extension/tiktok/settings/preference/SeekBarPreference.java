@@ -49,6 +49,9 @@ public class SeekBarPreference extends DialogPreference {
         this.baseSummary = summary;
         setTitle(title);
         setKey(setting.key);
+        // IntegerSetting owns string-backed storage. Preference.persistInt would read the
+        // same key as an Integer and crash on existing slider values (including saving 0%).
+        setPersistent(false);
         this.mValue = clamp(setting.savedValue());
         updateSummary();
     }
@@ -79,11 +82,17 @@ public class SeekBarPreference extends DialogPreference {
         int clamped = clamp(value);
         if (clamped != mValue) {
             mValue = clamped;
-            persistInt(clamped);
             setting.save(clamped);
             updateSummary();
             notifyChanged();
         }
+    }
+
+    public void setValueWithoutPersisting(int value) {
+        mValue = clamp(value);
+        if (seekBar != null) seekBar.setProgress(mValue - minValue);
+        updateSummary();
+        notifyChanged();
     }
 
     @Override

@@ -64,14 +64,36 @@ public final class StatusBarVideoFill {
     }
 
     private static final class Source {
-        final int width, height;
-        final boolean feed;
+        final int width, height, containerWidth, containerHeight;
+        final boolean feed, photo;
         Source(Object params) {
             width = size(params, "getVideoWidth");
             height = size(params, "getVideoHeight");
             Object operator = Reflect.invoke(params, "getParamsOperator");
             feed = feedEvent(Reflect.readField(operator, "eventType"));
+            containerWidth = size(params, "getContainerWidth");
+            containerHeight = size(params, "getContainerHeight");
+            Source previous = SOURCES.get(operator);
+            photo = previous != null && previous.photo;
         }
+        Source(Object operator, Object aweme) {
+            Object video = Reflect.invoke(aweme, "getVideo");
+            width = size(video, "getWidth"); height = size(video, "getHeight");
+            containerWidth = containerHeight = 0;
+            feed = feedEvent(Reflect.readField(operator, "eventType"));
+            photo = isPhoto(aweme);
+        }
+    }
+
+    public static boolean isPhoto(Object aweme) {
+        Object images = Reflect.invoke(aweme, "getImageInfos");
+        return (images instanceof java.util.List && !((java.util.List<?>) images).isEmpty())
+                || Reflect.invoke(aweme, "getPhotoModeImageInfo") != null
+                || Reflect.invoke(aweme, "getPhotoModeTextInfo") != null;
+    }
+
+    public static void rememberAweme(Object operator, Object aweme) {
+        SOURCES.put(operator, new Source(operator, aweme));
     }
 
     /** Original stream dimensions, recorded before any crop strategy can change their ratio. */
@@ -94,7 +116,8 @@ public final class StatusBarVideoFill {
     public static boolean useNativeCrop(Object operator) {
         Source source = SOURCES.get(operator);
         return keepFullSizeOnComments() && source != null && source.feed
-                && source.width > 0 && source.height >= source.width;
+                && !source.photo && source.width > 0 && source.height >= source.width
+                && cropAllowed(source.width, source.height, source.containerWidth, source.containerHeight);
     }
 
     private static boolean feedEvent(Object event) {
@@ -116,7 +139,13 @@ public final class StatusBarVideoFill {
             if (params != null) source = new Source(params);
         }
         int width = size(original, "getWidth"), height = size(original, "getHeight");
-        if ((source != null && source.width > source.height) || (source == null && width > height)) {
+        if (source != null && source.photo) {
+            release(video);
+            LANDSCAPE.put(video, Boolean.TRUE);
+            SeeThroughStatusBar.releaseFillTransforms(video);
+            return original;
+        }
+        if ((source != null && source.width > source.height * 1.5) || (source == null && width > height * 1.5)) {
             LANDSCAPE.put(video, Boolean.TRUE);
             SeeThroughStatusBar.releaseFillTransforms(video);
             return null;
@@ -129,7 +158,7 @@ public final class StatusBarVideoFill {
         int ratioHeight = source != null && source.height > 0 ? source.height : height;
         Geometry geometry = viewport == null
                 ? new Geometry(width, height, offset(original, "getTranslateX"), offset(original, "getTranslateY"))
-                : geometry(ratioWidth, ratioHeight, viewport, (FrameLayout.LayoutParams) video.getLayoutParams());
+                : smartGeometry(ratioWidth, ratioHeight, viewport, (FrameLayout.LayoutParams) video.getLayoutParams());
         Object copy = VideoFit.copyOf(original, geometry.width, geometry.height,
                 new float[]{geometry.x, geometry.y});
         if (copy == null) return null;
@@ -172,6 +201,24 @@ public final class StatusBarVideoFill {
         return new Geometry(filledWidth, filledHeight,
                 (float) Math.floor((viewport[0] - filledWidth) / 2) - viewport[2] - params.leftMargin,
                 (float) Math.floor((viewport[1] - filledHeight) / 2) - viewport[3] - params.topMargin);
+    }
+
+    /** At most 16% of the source may be discarded; this is a content-loss limit, not a scale. */
+    public static boolean cropAllowed(int width, int height, float viewportWidth, float viewportHeight) {
+        if (width <= 0 || height <= 0 || width > height) return false;
+        if (viewportWidth <= 0 || viewportHeight <= 0) return height > width * 1.5;
+        double sourceRatio = (double) width / height, targetRatio = viewportWidth / viewportHeight;
+        return Math.min(sourceRatio / targetRatio, targetRatio / sourceRatio) >= 0.84;
+    }
+
+    static Geometry smartGeometry(int width, int height, float[] viewport, FrameLayout.LayoutParams params) {
+        if (cropAllowed(width, height, viewport[0], viewport[1])) return geometry(width, height, viewport, params);
+        double scale = Math.min(viewport[0] / width, viewport[1] / height);
+        int fittedWidth = Math.max(1, (int) Math.round(width * scale));
+        int fittedHeight = Math.max(1, (int) Math.round(height * scale));
+        return new Geometry(fittedWidth, fittedHeight,
+                (float) Math.floor((viewport[0] - fittedWidth) / 2) - viewport[2] - params.leftMargin,
+                (float) Math.floor((viewport[1] - fittedHeight) / 2) - viewport[3] - params.topMargin);
     }
 
     private static void topLeft(View video) {
@@ -254,7 +301,7 @@ public final class StatusBarVideoFill {
             FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
             Geometry geometry = viewport == null
                     ? new Geometry(sourceWidth, sourceHeight, sourceX, sourceY)
-                    : geometry(ratioWidth, ratioHeight, viewport, params);
+                    : smartGeometry(ratioWidth, ratioHeight, viewport, params);
             boolean resize = params.width != geometry.width || params.height != geometry.height;
             boolean gravityChanged = params.gravity != (viewport == null ? gravity : (Gravity.TOP | Gravity.LEFT));
             if (viewport == null) release(view);

@@ -94,6 +94,7 @@ public class NativeSafeAreaTest {
             ids.putForTests(pkg, "47.4.3:f2t", footer.getId());
             ids.putForTests(pkg, "47.4.3:cnc", strip.getId());
             ids.putForTests(pkg, "viewpager_container", column.getId());
+            ids.putForTests(pkg, "video_seek_bar", 0x7f0a9cc5);
             int chin = SeeThroughBottomBar.getChinHeight(composer.getContext());
             for (int i = 0; i < 3; i++) NativeSafeArea.measureDetailInput(composer);
             assertEquals(chin, footer.getPaddingBottom());
@@ -133,7 +134,7 @@ public class NativeSafeAreaTest {
             composer.addView(footer, new FrameLayout.LayoutParams(-1, -2));
             window.addView(composer, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
             FrameLayout seekSlot = new FrameLayout(activity); seekSlot.setId(0x7f0a74c2);
-            View seek = new View(activity); seekSlot.addView(seek, new FrameLayout.LayoutParams(-1, 90));
+            View seek = new View(activity); seek.setId(0x7f0a9cc5); seekSlot.addView(seek, new FrameLayout.LayoutParams(-1, 90));
             window.addView(seekSlot, new FrameLayout.LayoutParams(-1, 206, Gravity.BOTTOM));
             activity.setContentView(window);
             var field = NativeSafeArea.class.getDeclaredField("IDS"); field.setAccessible(true);
@@ -144,6 +145,7 @@ public class NativeSafeAreaTest {
             ids.putForTests(pkg, "47.4.3:cnc", strip.getId());
             ids.putForTests(pkg, "47.4.3:vrd", seekSlot.getId());
             ids.putForTests(pkg, "viewpager_container", column.getId());
+            ids.putForTests(pkg, "video_seek_bar", 0x7f0a9cc5);
             int chin = SeeThroughBottomBar.getChinHeight(activity);
             NativeBottomBar.measureFeed(window);
             measureWindow(window);
@@ -154,7 +156,7 @@ public class NativeSafeAreaTest {
             assertEquals(expectedHeight, strip.getLayoutParams().height);
             assertEquals(composer.getTop(), cell.getBottom());
             assertEquals(composer.getTop() + 1, widgets.getTop() + caption.getBottom());
-            assertEquals(composer.getTop() - 3, seekSlot.getTop() + seek.getHeight() / 2);
+            assertEquals(composer.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
             // Native screen adaption can overwrite its strip without remeasuring the input.
             for (int i = 0; i < 4; i++) {
                 strip.getLayoutParams().height = 158;
@@ -164,13 +166,43 @@ public class NativeSafeAreaTest {
                 measureWindow(window);
                 assertEquals(expectedHeight, strip.getLayoutParams().height);
                 assertEquals(composer.getTop(), cell.getBottom());
-                assertEquals(composer.getTop() - 3, seekSlot.getTop() + seek.getHeight() / 2);
+                assertEquals(composer.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
             }
             composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
             NativeSafeArea.measureDetailPage(window);
             assertEquals(158, strip.getLayoutParams().height);
             assertEquals(0, ((FrameLayout.LayoutParams) seekSlot.getLayoutParams()).bottomMargin);
             NativeSafeArea.releaseDetailInput(composer);
+            ids.clear();
+        }
+    }
+
+    @Test public void quickDmFixedHeightGrowsWithoutSqueezingItsMatchParentInput() throws Exception {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
+            Activity activity = controller.get();
+            FrameLayout window = new FrameLayout(activity), outer = new FrameLayout(activity);
+            Root composer = new Root(activity); composer.setId(0x7f0a6d6a);
+            LinearLayout row = new LinearLayout(activity); row.setId(0x7f0a6d66);
+            row.addView(new View(activity), new LinearLayout.LayoutParams(-1, -1));
+            composer.addView(row, new FrameLayout.LayoutParams(-1, -1));
+            outer.addView(composer, new FrameLayout.LayoutParams(-1, 158));
+            window.addView(outer, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+            activity.setContentView(window);
+            var field = NativeSafeArea.class.getDeclaredField("IDS"); field.setAccessible(true);
+            ResourceIdCache ids = (ResourceIdCache) field.get(null);
+            String pkg = activity.getPackageName(); ids.putForTests(pkg, "47.4.3:udg", row.getId());
+            int chin = SeeThroughBottomBar.getChinHeight(activity);
+            for (int i = 0; i < 5; i++) {
+                NativeSafeArea.measureDetailInput(composer); measureWindow(window);
+                NativeSafeArea.finishDetailInput(composer); measureWindow(window);
+                assertEquals(158 + chin, composer.getHeight());
+                assertEquals(158 + chin, outer.getHeight());
+                assertEquals(158, row.getChildAt(0).getHeight());
+            }
+            composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
+            NativeSafeArea.measureDetailInput(composer); measureWindow(window);
+            assertEquals(158, composer.getHeight());
+            assertEquals(158, row.getChildAt(0).getHeight());
             ids.clear();
         }
     }

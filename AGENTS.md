@@ -38,3 +38,7 @@ Pinch hai ngón cũng ẩn chrome qua PinchComponent: chốt crop nền trước
 Khi pinch zoom, giữ nguyên vùng đen của bottom bar: giới hạn phần vẽ của cell native theo viewport đã chốt, không để texture phóng lớn vẽ vào hàng nút. Container thanh điều khiển clear-mode gốc l6f phải có nền đen trong vùng đó; giữ nguyên kích thước/vị trí nút và không thêm overlay ngoài component.
 
 Thanh tua phải neo sát mép trên vùng đen (tâm đường tua cách mép 1 px về phía video), kể cả khi tabs GONE và không còn cache hold/seek. Lấy chiều cao/margin của hàng clear-mode l6f đang hiện làm mốc trong measure/pre-draw; bù theo chiều cao touch target hiện tại, không giữ margin cũ khiến đường tua đè lên nút.
+
+Scale thông minh: tính crop từ tỉ lệ luồng gốc và viewport; chỉ crop nếu mất tối đa 16% khung. Video gần vuông/4:3 giữ đủ khung, nền mờ tĩnh lấy từ native cover loader và vẽ vào background component video_container_area, không tạo overlay; chặn callback ảnh bìa cũ sau recycle. Video ngang rộng giữ đường toàn màn hình gốc.
+
+Pager ảnh PhotoSlideViewPagerComponent/0EAS không được đi qua scale video, listener đợi đo video hoặc fallback scale cả ViewGroup. Slider dùng IntegerSetting lưu chuỗi, tuyệt đối không persistInt cùng key; 0% phải lưu và mở lại được.

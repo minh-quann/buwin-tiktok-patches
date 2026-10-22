@@ -328,7 +328,13 @@ public class TikTokPreferenceFragment extends AbstractPreferenceFragment {
     protected void syncPreferenceWithStoredValue(@NonNull Preference pref,
                                                 @NonNull Setting<?> setting,
                                                 @NonNull SharedPreferences preferences) {
-        if (pref instanceof NumberInputPreference) {
+        if (pref instanceof SeekBarPreference) {
+            Object value = preferences.getAll().get(setting.key);
+            int number = ((Number) setting.defaultValue).intValue();
+            try { if (value != null) number = Integer.parseInt(value.toString()); }
+            catch (NumberFormatException ignored) { }
+            ((SeekBarPreference) pref).setValueWithoutPersisting(number);
+        } else if (pref instanceof NumberInputPreference) {
             NumberInputPreference numberPref = (NumberInputPreference) pref;
             numberPref.setValueWithoutPersisting(preferences.getString(setting.key, setting.defaultValue.toString()));
         } else if (pref instanceof CreatorListPreference) {
@@ -354,7 +360,11 @@ public class TikTokPreferenceFragment extends AbstractPreferenceFragment {
             @NonNull Setting setting,
             boolean applySettingToPreference
     ) {
-        if (pref instanceof NumberInputPreference) {
+        if (pref instanceof SeekBarPreference) {
+            SeekBarPreference slider = (SeekBarPreference) pref;
+            if (applySettingToPreference) slider.setValueWithoutPersisting(((Number) setting.savedValue()).intValue());
+            else Setting.privateSetValueFromString(setting, Integer.toString(slider.getValue()));
+        } else if (pref instanceof NumberInputPreference) {
             NumberInputPreference numberInputPreference = (NumberInputPreference) pref;
             if (applySettingToPreference) {
                 numberInputPreference.setValueWithoutPersisting(setting.savedValue().toString());
@@ -427,6 +437,9 @@ public class TikTokPreferenceFragment extends AbstractPreferenceFragment {
     @Override
     protected boolean prefIsSetToDefault(Preference pref, Setting<?> setting) {
         String defaultValue = setting.defaultValue.toString();
+        if (pref instanceof SeekBarPreference) {
+            return defaultValue.equals(Integer.toString(((SeekBarPreference) pref).getValue()));
+        }
         if (pref instanceof NumberInputPreference) {
             return defaultValue.equals(((NumberInputPreference) pref).getValue());
         }
@@ -450,6 +463,9 @@ public class TikTokPreferenceFragment extends AbstractPreferenceFragment {
                                                   @NonNull Setting<?> setting) {
         String expected = setting.savedValue() instanceof Enum<?>
                 ? ((Enum<?>) setting.savedValue()).name() : String.valueOf(setting.savedValue());
+        if (pref instanceof SeekBarPreference) {
+            return expected.equals(Integer.toString(((SeekBarPreference) pref).getValue()));
+        }
         if (pref instanceof NumberInputPreference) {
             return expected.equals(((NumberInputPreference) pref).getValue());
         }

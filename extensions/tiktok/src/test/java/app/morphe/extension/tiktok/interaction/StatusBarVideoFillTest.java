@@ -68,7 +68,7 @@ public class StatusBarVideoFillTest {
         Scene(Activity activity) {
             cell = new FrameLayout(activity);
             player = new FrameLayout(activity);
-            cell.addView(player, new FrameLayout.LayoutParams(1000, 1600));
+            cell.addView(player, new FrameLayout.LayoutParams(1000, 1900));
             activity.setContentView(cell);
             content = activity.findViewById(android.R.id.content);
         }
@@ -84,7 +84,7 @@ public class StatusBarVideoFillTest {
         try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
             Scene scene = new Scene(controller.get());
             layout(scene.content, 1000, 2100);
-            Result original = new Result(1000, 1600);
+            Result original = new Result(1000, 1900);
             Result applied = (Result) VideoFit.fitted(scene.player, original);
             Result checked = (Result) VideoFit.fitted(scene.player, original);
             assertNotSame(original, applied);
@@ -94,7 +94,7 @@ public class StatusBarVideoFillTest {
             assertEquals(applied.y, checked.y);
             assertTrue(applied.height >= 2100);
             assertEquals(1000, original.width);
-            assertEquals(1600, original.height);
+            assertEquals(1900, original.height);
             scene.apply(applied);
             layout(scene.content, 1000, 2100);
             scene.player.getViewTreeObserver().dispatchOnPreDraw();
@@ -107,7 +107,7 @@ public class StatusBarVideoFillTest {
     @Test public void bindBeforeMeasureFinishesBeforeFirstDrawWithoutPostingResize() {
         try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
             Scene scene = new Scene(controller.get());
-            Result source = new Result(1000, 1600);
+            Result source = new Result(1000, 1900);
             scene.apply((Result) VideoFit.fitted(scene.player, source));
             layout(scene.content, 1000, 2100);
             assertTrue(scene.player.getViewTreeObserver().dispatchOnPreDraw()); // cancels draw
@@ -123,7 +123,7 @@ public class StatusBarVideoFillTest {
             Scene scene = new Scene(controller.get());
             layout(scene.content, 1000, 2100);
             for (int i = 0; i < 20; i++) {
-                Result original = new Result(1000, i % 2 == 0 ? 1600 : 1900);
+                Result original = new Result(1000, i % 2 == 0 ? 1900 : 2000);
                 Result next = (Result) VideoFit.fitted(scene.player, original);
                 scene.apply(next);
                 layout(scene.content, 1000, 2100);
@@ -139,10 +139,10 @@ public class StatusBarVideoFillTest {
             Scene scene = new Scene(controller.get());
             layout(scene.content, 1000, 2100);
             Settings.FIT_VIDEO_TO_SCREEN.save(true);
-            assertNull(StatusBarVideoFill.fitted(scene.player, new Result(1000, 1600)));
+            assertNull(StatusBarVideoFill.fitted(scene.player, new Result(1000, 1900)));
             Settings.FIT_VIDEO_TO_SCREEN.save(false);
             Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SHIFT);
-            assertNull(StatusBarVideoFill.fitted(scene.player, new Result(1000, 1600)));
+            assertNull(StatusBarVideoFill.fitted(scene.player, new Result(1000, 1900)));
         }
     }
 
@@ -151,14 +151,14 @@ public class StatusBarVideoFillTest {
             Scene scene = new Scene(controller.get());
             layout(scene.content, 1000, 2100);
             SettingsStatus.videoOverlaysEnabled = false;
-            Result original = new Result(1000, 1600);
+            Result original = new Result(1000, 1900);
             assertSame(original, VideoFit.fitted(scene.player, original));
             assertFalse(StatusBarVideoFill.handles(scene.player));
         }
     }
 
     @Test public void offsetsAccountForContainerPositionAndCoverEveryEdge() {
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1000, 1600);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1000, 1900);
         params.leftMargin = 4; params.topMargin = 7;
         var geometry = StatusBarVideoFill.geometry(1000, 1600, new float[]{1000, 2100, 10, 100}, params);
         assertEquals((float) Math.floor((1000 - geometry.width) / 2f) - 14, geometry.x, 0f);
@@ -210,6 +210,38 @@ public class StatusBarVideoFillTest {
         assertTrue(frame.y + frame.height >= 2641);
     }
 
+    @Test public void squareAndFourByThreeKeepTheWholeFrameWhilePortraitCovers() {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1320, 2638);
+        float[] viewport = {1320, 2638, 0, 0};
+        for (int[] source : new int[][]{{1080, 1080}, {1440, 1080}, {1080, 1440}}) {
+            var frame = StatusBarVideoFill.smartGeometry(source[0], source[1], viewport, params);
+            assertTrue(frame.width <= 1320 && frame.height <= 2638);
+            assertEquals(source[0] / (float) source[1], frame.width / (float) frame.height, .002f);
+            assertEquals(2638, frame.y * 2 + frame.height, 1);
+        }
+        assertTrue(StatusBarVideoFill.cropAllowed(720, 1280, 1320, 2638));
+        assertFalse(StatusBarVideoFill.cropAllowed(1080, 1440, 1320, 2638));
+    }
+
+    public static class Photo {
+        public Object getPhotoModeImageInfo() { return new Object(); }
+    }
+    @Test public void photoResultsNeverRegisterTheVideoResizeListener() {
+        Operator operator = new Operator();
+        StatusBarVideoFill.rememberAweme(operator, new Photo());
+        Params params = new Params(operator, 1080, 1440);
+        StatusBarVideoFill.rememberParams(params);
+        assertFalse(StatusBarVideoFill.useNativeCrop(operator));
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
+            Scene scene = new Scene(controller.get()); layout(scene.content, 1000, 2100);
+            Result photo = new Result(1000, 1333);
+            StatusBarVideoFill.rememberResult(photo, params);
+            assertSame(photo, VideoFit.fitted(scene.player, photo));
+            assertFalse(scene.player.getViewTreeObserver().dispatchOnPreDraw());
+            assertEquals(1900, scene.player.getLayoutParams().height);
+        }
+    }
+
     @Test public void liveSurfaceMeasureCoversStatusAreaWithoutScalingItsSiblingCard() throws Exception {
         try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
             Scene scene = new Scene(controller.get());
@@ -217,7 +249,7 @@ public class StatusBarVideoFillTest {
             ((FrameLayout.LayoutParams) scene.player.getLayoutParams()).topMargin = 144;
             scene.player.setPadding(7, 9, 0, 0);
             View surface = new View(controller.get());
-            scene.player.addView(surface, new FrameLayout.LayoutParams(1000, 1600));
+            scene.player.addView(surface, new FrameLayout.LayoutParams(1000, 1900));
             View card = new View(controller.get());
             scene.cell.addView(card, new FrameLayout.LayoutParams(800, 300));
             layout(scene.content, 1000, 2100);
@@ -234,7 +266,7 @@ public class StatusBarVideoFillTest {
             assertEquals(1f, card.getScaleX(), 0f);
             assertEquals(300, card.getLayoutParams().height);
             assertEquals(0, NativeLivePreview.measure(surface, 1920, 1080));
-            assertEquals(1600, surface.getLayoutParams().height);
+            assertEquals(1900, surface.getLayoutParams().height);
         }
     }
 }

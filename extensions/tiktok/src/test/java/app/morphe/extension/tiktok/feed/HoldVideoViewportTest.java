@@ -68,7 +68,7 @@ public class HoldVideoViewportTest {
             View content = activity.findViewById(android.R.id.content);
             layout(content);
             SeeThroughBottomBar.adjustBottomBarChin(bar);
-            Result source = new Result(720, 1280);
+            Result source = new Result(720, 1440);
             Result before = (Result) VideoFit.fitted(player, source);
             Edge owner = new Edge(gesture);
             for (int i = 0; i < 5; i++) {

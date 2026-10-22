@@ -530,7 +530,13 @@ public final class SeeThroughStatusBar {
             // any legacy surface transform before TikTok applied its result.
             return;
         }
-        if (doScale && surface != null && surface.getWidth() > surface.getHeight()) {
+        if (doScale && surface == null) {
+            // Photo carousels are touch pagers, not video surfaces. Scaling their container
+            // changes child hit regions and lets the outer profile pager steal a horizontal drag.
+            releaseFillTransforms(player);
+            return;
+        }
+        if (doScale && surface.getWidth() > surface.getHeight()) {
             releaseFillTransforms(player);
             return;
         }

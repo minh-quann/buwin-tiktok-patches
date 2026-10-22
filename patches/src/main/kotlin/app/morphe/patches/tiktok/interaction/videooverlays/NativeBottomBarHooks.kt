@@ -241,7 +241,53 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
             } == true
     }
     check(pinch.implementation!!.registerCount <= 16) { "Native pinch: review parameter register range" }
+    val quickDmType = "Lcom/ss/android/ugc/aweme/im/sdk/chat/feature/reply/feature/feed/DetailFeedQuickDMFragment;"
+    val quickDm = classDefBy(quickDmType).methods.single { it.name == "onViewCreated" && it.parameterTypes.size == 2 }
+    val operatorInit = definition.methods.single { it.name == "<init>" && it.parameterTypes.first() == "Lcom/ss/android/ugc/aweme/feed/model/Aweme;" }
+    val feedAdaption = "Lcom/ss/android/ugc/feed/platform/cell/component/adaption/FeedCellAdaptionComponentV2;"
+    val feedMethods = classDefBy(feedAdaption).methods
+    val backgroundMethods = listOf("Yp", "onRenderFirstFrame").map { name -> feedMethods.single { it.name == name } }
+    check(feedMethods.any { it.name == "fq" && it.parameterTypes.isEmpty() })
+    check(classDefBy(feedAdaption).fields.any { it.name == "LLLIIL" && it.type == "LX/0Y8N;" })
+    check(classDefBy("LX/0Y8N;").methods.any { it.name == "<init>" && it.parameterTypes.isEmpty() })
+    val coverType = "LX/1OPe;"
+    val cover = classDefBy(coverType)
+    check(cover.fields.single { it.name == "LL" }.type == feedAdaption)
+    val coverInit = cover.methods.single { it.name == "<init>" }
+    val coverInvoke = cover.methods.single { it.name == "invoke" }
+    check(coverInvoke.implementation!!.registerCount <= 16)
+    val background = "Lapp/morphe/extension/tiktok/interaction/NativeVideoBackground;"
     return {
+        mutableClassDefBy(quickDmType).methods.single { it.name == quickDm.name }.apply {
+            implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }
+                .reversed().forEach { addInstructions(it,
+                    "invoke-static/range { p1 .. p1 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->measureDetailInput(Landroid/view/View;)V") }
+        }
+        mutableClassDefBy(operator).methods.single { it.name == operatorInit.name && it.parameterTypes == operatorInit.parameterTypes }.apply {
+            implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }
+                .reversed().forEach { addInstructions(it,
+                    "invoke-static/range { p0 .. p1 }, Lapp/morphe/extension/tiktok/interaction/StatusBarVideoFill;->rememberAweme(Ljava/lang/Object;Ljava/lang/Object;)V") }
+        }
+        backgroundMethods.forEach { original ->
+            mutableClassDefBy(feedAdaption).methods.single { it.name == original.name }.apply {
+                addInstructions(0, "invoke-static/range { p0 .. p0 }, $background->bind(Ljava/lang/Object;)V")
+            }
+        }
+        mutableClassDefBy(feedAdaption).methods.single { it.name == "unBind" }.addInstructions(0,
+            "invoke-static/range { p0 .. p0 }, $background->release(Ljava/lang/Object;)V")
+        mutableClassDefBy(coverType).methods.single { it.name == coverInit.name }.apply {
+            implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }
+                .reversed().forEach { addInstructions(it, "invoke-static { p0 }, $background->rememberCover(Ljava/lang/Object;)V") }
+        }
+        mutableClassDefBy(coverType).methods.single { it.name == coverInvoke.name }.apply {
+            addInstructionsWithLabels(0, """
+                invoke-static { p0, p1 }, $background->cover(Ljava/lang/Object;Ljava/lang/Object;)Z
+                move-result v0
+                if-eqz v0, :native_cover_original
+                sget-object v0, Lkotlin/Unit;->LIZ:Lkotlin/Unit;
+                return-object v0
+            """, ExternalLabel("native_cover_original", getInstruction(0)))
+        }
         mutableClassDefBy(cell).methods.add(cellDraw)
         screenWriters.forEach { writer ->
             mutableClassDefBy(screenType).methods.single { it.name == writer.name && it.parameterTypes == writer.parameterTypes }.apply {
@@ -276,7 +322,10 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
                         .reversed().forEach { existing.addInstructions(it,
                             "invoke-static/range { p0 .. p0 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->finishDetailInput(Landroid/view/View;)V") }
                 }
-                existing.addInstructions(0, call)
+                existing.addInstructions(0, call + if (hook == "measureDetailInput") """
+                    invoke-static { p0, p2 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->detailHeightSpec(Landroid/view/View;I)I
+                    move-result p2
+                """ else "")
             }
             else view.methods.add(nativeOverride(type, "onMeasure", listOf("I", "I"), 3, """
                 $call
