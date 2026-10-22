@@ -207,6 +207,55 @@ public class NativeSafeAreaTest {
         }
     }
 
+    @Test public void quickDmUsesMeasuredInputWhenNativeStripAlreadyReservesExtraRoom() throws Exception {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
+            Activity activity = controller.get();
+            FrameLayout window = new FrameLayout(activity), cell = new FrameLayout(activity);
+            LinearLayout column = new LinearLayout(activity); column.setOrientation(LinearLayout.VERTICAL);
+            column.setId(View.generateViewId());
+            View strip = new View(activity); strip.setId(View.generateViewId());
+            column.addView(cell, new LinearLayout.LayoutParams(-1, 0, 1));
+            column.addView(strip, new LinearLayout.LayoutParams(-1, 316));
+            window.addView(column, new FrameLayout.LayoutParams(-1, -1));
+            Root composer = new Root(activity);
+            LinearLayout row = new LinearLayout(activity); row.setId(View.generateViewId());
+            row.addView(new View(activity), new LinearLayout.LayoutParams(-1, -1));
+            composer.addView(row, new FrameLayout.LayoutParams(-1, -1));
+            window.addView(composer, new FrameLayout.LayoutParams(-1, 158, Gravity.BOTTOM));
+            FrameLayout seekSlot = new FrameLayout(activity); seekSlot.setId(View.generateViewId());
+            View track = new View(activity); track.setId(View.generateViewId());
+            seekSlot.addView(track, new FrameLayout.LayoutParams(-1, 90));
+            window.addView(seekSlot, new FrameLayout.LayoutParams(-1, 206, Gravity.BOTTOM));
+            activity.setContentView(window);
+            var field = NativeSafeArea.class.getDeclaredField("IDS"); field.setAccessible(true);
+            ResourceIdCache ids = (ResourceIdCache) field.get(null);
+            ids.clear();
+            String pkg = activity.getPackageName();
+            ids.putForTests(pkg, "47.4.3:udg", row.getId());
+            ids.putForTests(pkg, "47.4.3:cnc", strip.getId());
+            ids.putForTests(pkg, "viewpager_container", column.getId());
+            ids.putForTests(pkg, "47.4.3:vrd", seekSlot.getId());
+            ids.putForTests(pkg, "video_seek_bar", track.getId());
+            int expected = 158 + SeeThroughBottomBar.getChinHeight(activity);
+            for (int i = 0; i < 4; i++) {
+                // Native screen adaption rewrites its own reserve, including a row already.
+                strip.getLayoutParams().height = 316;
+                NativeSafeArea.measureDetailInput(composer);
+                measureWindow(window);
+                NativeSafeArea.finishDetailInput(composer);
+                measureWindow(window);
+                assertEquals(expected, strip.getLayoutParams().height);
+                assertEquals(composer.getTop(), cell.getBottom());
+                assertEquals(composer.getTop() - 1, seekSlot.getTop() + track.getHeight() / 2);
+                // Entry of the next pass must not grow it again before finishDetailInput.
+                NativeSafeArea.measureDetailInput(composer);
+                assertEquals(expected, strip.getLayoutParams().height);
+            }
+            NativeSafeArea.releaseDetailInput(composer);
+            ids.clear();
+        }
+    }
+
     private static void measureWindow(View window) {
         window.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));

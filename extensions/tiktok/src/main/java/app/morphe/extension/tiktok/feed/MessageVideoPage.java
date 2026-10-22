@@ -50,7 +50,13 @@ public final class MessageVideoPage {
                 if (strip.getId() != stripId || strip.getVisibility() == View.GONE) continue;
                 ViewGroup.LayoutParams params = strip.getLayoutParams();
                 int height = params != null && params.height >= 0 ? params.height : strip.getMeasuredHeight();
-                return height > 0 && height < fullHeight ? fullHeight - height : fullHeight;
+                // Callers can hand over the full pager column or an already shortened cell.
+                // Always subtract from the stable column, never from a cell that already lost
+                // this strip. Cell coordinates during a swipe must not enter this calculation.
+                int columnHeight = column.getMeasuredHeight() > 0 ? column.getMeasuredHeight() : column.getHeight();
+                if (columnHeight <= 0) columnHeight = fullHeight;
+                return height > 0 && height < columnHeight
+                        ? Math.min(fullHeight, columnHeight - height) : fullHeight;
             }
         }
         return fullHeight;

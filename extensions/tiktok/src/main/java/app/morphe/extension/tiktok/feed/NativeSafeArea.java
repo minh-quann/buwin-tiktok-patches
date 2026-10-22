@@ -136,19 +136,24 @@ public final class NativeSafeArea {
             int base = held != null && params.height == held[1] ? held[0] : params.height;
             int extra = root.getVisibility() == View.VISIBLE ? added : 0;
             int height = base + extra;
+            int measuredReserve = 0;
             if (extra > 0) {
-                // Keep the last measured divider/root padding during the next measure's entry.
-                if (!measured && held != null && held.length > 2 && held[2] == extra)
-                    height += Math.max(0, held[1] - held[0] - extra);
-                if (measured) height = Math.max(height, root.getMeasuredHeight());
+                // Screen adaption may already include the input/safe area in its new strip.
+                // Adding extra to that value and taking max() reserves the same room twice.
+                // The measured native input is the boundary, even when smaller than the
+                // strip TikTok just wrote. Carry it across measure entry too: otherwise each
+                // pass alternates between base+extra and the actual input height.
+                if (measured && root.getMeasuredHeight() > 0) measuredReserve = root.getMeasuredHeight();
+                else if (held != null && held.length > 3 && held[2] == extra) measuredReserve = held[3];
+                if (measuredReserve > 0) height = measuredReserve;
             }
-            HEIGHTS.put(strip, new int[]{base, height, extra});
+            HEIGHTS.put(strip, new int[]{base, height, extra, measuredReserve});
             STRIP_OWNERS.put(strip, new java.lang.ref.WeakReference<>(root));
             if (params.height != height) {
                 params.height = height;
                 strip.setLayoutParams(params);
             }
-            moveDetailSeek(window, strip.getVisibility() == View.GONE ? 0 : height - base,
+            moveDetailSeek(window, strip.getVisibility() == View.GONE ? 0 : extra,
                     strip.getVisibility() == View.GONE ? 0 : height);
         }
     }

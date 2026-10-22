@@ -41,6 +41,26 @@ public class MessageVideoPageTest {
                 View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
         view.layout(0, 0, 1320, 2868);
     }
+    @Test public void shortenedAndPreloadedCellsDoNotSubtractTheComposerTwice() throws Exception {
+        var context = org.robolectric.RuntimeEnvironment.getApplication();
+        LinearLayout column = new LinearLayout(context); column.setOrientation(LinearLayout.VERTICAL);
+        column.setId(View.generateViewId());
+        View cell = new View(context), strip = new View(context); strip.setId(View.generateViewId());
+        column.addView(cell, new LinearLayout.LayoutParams(-1, 0, 1));
+        column.addView(strip, new LinearLayout.LayoutParams(-1, 230));
+        var ids = cache(MessageVideoPage.class);
+        ids.putForTests(context.getPackageName(), "viewpager_container", column.getId());
+        ids.putForTests(context.getPackageName(), "47.4.3:cnc", strip.getId());
+        try {
+            layout(column);
+            assertEquals(2638, MessageVideoPage.bottom(cell, 2868));
+            assertEquals(2638, MessageVideoPage.bottom(cell, cell.getHeight()));
+            cell.offsetTopAndBottom(-2638);
+            assertEquals(2638, MessageVideoPage.bottom(cell, cell.getHeight()));
+            cell.offsetTopAndBottom(5276);
+            assertEquals(2638, MessageVideoPage.bottom(cell, cell.getHeight()));
+        } finally { ids.clear(); }
+    }
     @Test public void sharedVideoFillsAboveSafeComposerWhileHeaderAndLandscapeStayNative() throws Exception {
         try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.detail.ui.DetailActivity.class).setup()) {
             Activity activity = controller.get(); Utils.setContext(activity);
