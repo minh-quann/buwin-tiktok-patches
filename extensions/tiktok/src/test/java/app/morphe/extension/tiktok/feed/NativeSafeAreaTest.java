@@ -3,6 +3,8 @@ package app.morphe.extension.tiktok.feed;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Insets;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.provider.Settings;
 import android.view.View;
 import android.view.Gravity;
@@ -98,11 +100,11 @@ public class NativeSafeAreaTest {
             int chin = SeeThroughBottomBar.getChinHeight(composer.getContext());
             for (int i = 0; i < 3; i++) NativeSafeArea.measureDetailInput(composer);
             assertEquals(chin, footer.getPaddingBottom());
-            assertEquals(158 + chin, strip.getLayoutParams().height);
+            assertEquals(158 + chin + 15, strip.getLayoutParams().height);
             NativeSafeArea.releaseDetailInput(composer);
             assertEquals(158, strip.getLayoutParams().height);
             NativeSafeArea.measureDetailInput(composer);
-            assertEquals(158 + chin, strip.getLayoutParams().height);
+            assertEquals(158 + chin + 15, strip.getLayoutParams().height);
             composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
             NativeSafeArea.measureDetailInput(composer);
             assertEquals(0, footer.getPaddingBottom());
@@ -153,10 +155,11 @@ public class NativeSafeAreaTest {
             measureWindow(window);
             int expectedHeight = 160 + chin;
             assertEquals(expectedHeight, composer.getHeight());
-            assertEquals(expectedHeight, strip.getLayoutParams().height);
-            assertEquals(composer.getTop(), cell.getBottom());
-            assertEquals(composer.getTop() + 1, widgets.getTop() + caption.getBottom());
-            assertEquals(composer.getTop() - 12, seekSlot.getTop() + seek.getHeight() / 2);
+            assertEquals(expectedHeight + 15, strip.getLayoutParams().height);
+            assertEquals(composer.getTop() - 15, cell.getBottom());
+            assertEquals(cell.getBottom() + 1, widgets.getTop() + caption.getBottom());
+            assertEquals(composer.getTop() - 16, seekSlot.getTop() + seek.getHeight() / 2);
+            assertEquals(strip.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
             // Native screen adaption can overwrite its strip without remeasuring the input.
             for (int i = 0; i < 4; i++) {
                 strip.getLayoutParams().height = 158;
@@ -164,9 +167,10 @@ public class NativeSafeAreaTest {
                 NativeSafeArea.measureDetailInput(composer);
                 NativeSafeArea.finishDetailInput(composer);
                 measureWindow(window);
-                assertEquals(expectedHeight, strip.getLayoutParams().height);
-                assertEquals(composer.getTop(), cell.getBottom());
-                assertEquals(composer.getTop() - 12, seekSlot.getTop() + seek.getHeight() / 2);
+                assertEquals(expectedHeight + 15, strip.getLayoutParams().height);
+                assertEquals(composer.getTop() - 15, cell.getBottom());
+                assertEquals(composer.getTop() - 16, seekSlot.getTop() + seek.getHeight() / 2);
+                assertEquals(strip.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
             }
             composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
             NativeSafeArea.measureDetailPage(window);
@@ -207,13 +211,15 @@ public class NativeSafeAreaTest {
         }
     }
 
-    @Test public void quickDmUsesMeasuredInputWhenNativeStripAlreadyReservesExtraRoom() throws Exception {
+    @Test @Config(qualifiers = "xxhdpi")
+    public void quickDmUsesMeasuredInputWhenNativeStripAlreadyReservesExtraRoom() throws Exception {
         try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
             Activity activity = controller.get();
             FrameLayout window = new FrameLayout(activity), cell = new FrameLayout(activity);
             LinearLayout column = new LinearLayout(activity); column.setOrientation(LinearLayout.VERTICAL);
             column.setId(View.generateViewId());
             View strip = new View(activity); strip.setId(View.generateViewId());
+            strip.setBackgroundColor(Color.BLUE);
             column.addView(cell, new LinearLayout.LayoutParams(-1, 0, 1));
             column.addView(strip, new LinearLayout.LayoutParams(-1, 316));
             window.addView(column, new FrameLayout.LayoutParams(-1, -1));
@@ -240,18 +246,26 @@ public class NativeSafeAreaTest {
             for (int i = 0; i < 4; i++) {
                 // Native screen adaption rewrites its own reserve, including a row already.
                 strip.getLayoutParams().height = 316;
+                track.getLayoutParams().height = i % 2 == 0 ? 90 : 140;
                 NativeSafeArea.measureDetailInput(composer);
                 measureWindow(window);
                 NativeSafeArea.finishDetailInput(composer);
                 measureWindow(window);
-                assertEquals(expected, strip.getLayoutParams().height);
-                assertEquals(composer.getTop(), cell.getBottom());
-                assertEquals(composer.getTop() - 12, seekSlot.getTop() + track.getHeight() / 2);
+                assertEquals(expected, composer.getHeight());
+                assertEquals(expected + 15, strip.getLayoutParams().height);
+                assertEquals(composer.getTop() - 15, cell.getBottom());
+                assertEquals(composer.getTop() - 16, seekSlot.getTop() + track.getHeight() / 2);
+                assertEquals(strip.getTop() - 1, seekSlot.getTop() + track.getHeight() / 2);
+                assertEquals(Color.BLACK, ((ColorDrawable) strip.getBackground()).getColor());
                 // Entry of the next pass must not grow it again before finishDetailInput.
                 NativeSafeArea.measureDetailInput(composer);
-                assertEquals(expected, strip.getLayoutParams().height);
+                assertEquals(expected + 15, strip.getLayoutParams().height);
             }
+            composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
+            NativeSafeArea.measureDetailInput(composer);
+            assertEquals(Color.BLUE, ((ColorDrawable) strip.getBackground()).getColor());
             NativeSafeArea.releaseDetailInput(composer);
+            assertEquals(Color.BLUE, ((ColorDrawable) strip.getBackground()).getColor());
             ids.clear();
         }
     }

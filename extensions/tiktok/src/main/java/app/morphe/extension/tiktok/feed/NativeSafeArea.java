@@ -1,6 +1,9 @@
 package app.morphe.extension.tiktok.feed;
 
 import android.graphics.Rect;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,13 +19,16 @@ import app.morphe.extension.tiktok.settings.SettingsStatus;
 
 /** Shared bottom-safe-area policy consumed by the original keyboard and sheet components. */
 public final class NativeSafeArea {
-    /** Physical pixels above the input edge, independent of display density. */
-    private static final int DETAIL_SEEK_GAP_PX = 12;
+    /** Physical pixels: raise the track 16 above the input, just 1 above its black boundary. */
+    private static final int DETAIL_SEEK_OFFSET_PX = 16;
+    private static final int SEEK_EDGE_INSET_PX = 1;
+    private static final int DETAIL_TOP_BAND_PX = DETAIL_SEEK_OFFSET_PX - SEEK_EDGE_INSET_PX;
     private static final ResourceIdCache IDS = new ResourceIdCache();
     private static final Map<View, int[]> PADDING = new WeakHashMap<>();
     private static final Map<View, int[]> HEIGHTS = new WeakHashMap<>();
     private static final Map<View, java.lang.ref.WeakReference<View>> STRIP_OWNERS = new WeakHashMap<>();
     private static final Map<View, int[]> SEEK_MARGINS = new WeakHashMap<>();
+    private static final Map<View, Drawable> STRIP_BACKGROUNDS = new WeakHashMap<>();
     private NativeSafeArea() { }
 
     public static int minimumBottom(View view) {
@@ -137,7 +143,8 @@ public final class NativeSafeArea {
             int[] held = HEIGHTS.get(strip);
             int base = held != null && params.height == held[1] ? held[0] : params.height;
             int extra = root.getVisibility() == View.VISIBLE ? added : 0;
-            int height = base + extra;
+            int band = extra > 0 ? DETAIL_TOP_BAND_PX : 0;
+            int height = base + extra + band;
             int measuredReserve = 0;
             if (extra > 0) {
                 // Screen adaption may already include the input/safe area in its new strip.
@@ -147,8 +154,9 @@ public final class NativeSafeArea {
                 // pass alternates between base+extra and the actual input height.
                 if (measured && root.getMeasuredHeight() > 0) measuredReserve = root.getMeasuredHeight();
                 else if (held != null && held.length > 3 && held[2] == extra) measuredReserve = held[3];
-                if (measuredReserve > 0) height = measuredReserve;
+                if (measuredReserve > 0) height = measuredReserve + band;
             }
+            paintDetailStrip(strip, band > 0);
             HEIGHTS.put(strip, new int[]{base, height, extra, measuredReserve});
             STRIP_OWNERS.put(strip, new java.lang.ref.WeakReference<>(root));
             if (params.height != height) {
@@ -157,6 +165,19 @@ public final class NativeSafeArea {
             }
             moveDetailSeek(window, strip.getVisibility() == View.GONE ? 0 : extra,
                     strip.getVisibility() == View.GONE ? 0 : height);
+        }
+    }
+
+    /** Paint the existing native pager spacer; it owns the same edge the player and seek use. */
+    private static void paintDetailStrip(View strip, boolean black) {
+        if (black) {
+            if (!STRIP_BACKGROUNDS.containsKey(strip)) STRIP_BACKGROUNDS.put(strip, strip.getBackground());
+            Drawable background = strip.getBackground();
+            if (!(background instanceof ColorDrawable) || ((ColorDrawable) background).getColor() != Color.BLACK)
+                strip.setBackground(new ColorDrawable(Color.BLACK));
+        } else if (STRIP_BACKGROUNDS.containsKey(strip)) {
+            Drawable original = STRIP_BACKGROUNDS.remove(strip);
+            strip.setBackground(original);
         }
     }
 
@@ -192,9 +213,10 @@ public final class NativeSafeArea {
             if (slotHeight > 0 && trackHeight > 0) {
                 // The touch row is shorter than the 206px seek slot. Anchoring the entire
                 // slot above the input puts the real line through captions. Anchor the track
-                // itself, leaving a small physical-pixel gap above the input's upper edge.
+                // itself, one pixel above the black strip's upper edge. The strip includes
+                // the top band, so both the video viewport and the track move together.
                 targetTop = top;
-                targetBottom = reserve + track.getTop() + trackHeight / 2 - slotHeight + DETAIL_SEEK_GAP_PX;
+                targetBottom = reserve + track.getTop() + trackHeight / 2 - slotHeight + SEEK_EDGE_INSET_PX;
             }
         }
         SEEK_MARGINS.put(slot, new int[]{top, bottom, extra, targetTop, targetBottom});
@@ -213,6 +235,7 @@ public final class NativeSafeArea {
             released = true;
             int[] held = HEIGHTS.remove(strip);
             STRIP_OWNERS.remove(strip);
+            paintDetailStrip(strip, false);
             ViewGroup.LayoutParams params = strip.getLayoutParams();
             if (held != null && params != null && params.height == held[1]) {
                 params.height = held[0];

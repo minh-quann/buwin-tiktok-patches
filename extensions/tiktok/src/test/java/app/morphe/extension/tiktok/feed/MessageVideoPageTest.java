@@ -101,11 +101,11 @@ public class MessageVideoPageTest {
             for (int i = 0; i < 4; i++) NativeSafeArea.measureDetailInput(keyboard);
             layout(root.getRootView()); layout(activity.findViewById(android.R.id.content));
             assertEquals(chin, row.getPaddingBottom());
-            assertEquals(158 + chin, strip.getLayoutParams().height);
+            assertEquals(158 + chin + 15, strip.getLayoutParams().height);
             assertEquals(chin + 16, 2868 - message.getTop() - keyboard.getTop() - row.getTop() - input.getBottom());
             assertTrue(MessageVideoPage.active(activity));
             float[] viewport = SeeThroughStatusBar.nativeFillViewport(player);
-            assertEquals(2868 - 158 - chin, viewport[1], 0f);
+            assertEquals(2868 - 158 - chin - 15, viewport[1], 0f);
             Result portrait = (Result) VideoFit.fitted(player, new Result(1320, 2346));
             assertTrue(portrait.getHeight() >= viewport[1]);
             assertTrue(portrait.getTranslateY() + playerParent.getTop() <= 0);

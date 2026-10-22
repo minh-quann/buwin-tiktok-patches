@@ -39,7 +39,7 @@ Khi pinch zoom, giữ nguyên vùng đen của bottom bar: giới hạn phần v
 
 Thanh tua phải neo sát mép trên vùng đen (tâm đường tua cách mép 1 px về phía video), kể cả khi tabs GONE và không còn cache hold/seek. Lấy chiều cao/margin của hàng clear-mode l6f đang hiện làm mốc trong measure/pre-draw; bù theo chiều cao touch target hiện tại, không giữ margin cũ khiến đường tua đè lên nút.
 
-Riêng màn video mở riêng có ô nhập bình luận/DM, tâm đường tua phải cách mép trên ô nhập 12 px vật lý, không nhân theo density và không cộng dồn sau remeasure. Honor của chủ repo hiện dùng Android 17/API 37 (đã đọc ADB); kiểm tra SDK 30/35 không thay thế kiểm tra API 37.
+Riêng màn video mở riêng có ô nhập bình luận/DM, tâm đường tua phải cao hơn mép trên ô nhập 16 px vật lý (12 + 4 theo yêu cầu). Nâng mép nền đen native lên cùng: spacer cnc dự trữ chiều cao ô nhập đã đo + 15 px, có nền đen; tâm đường tua luôn ở phía video, cách mép nền đen 1 px. Player lấy viewport từ chính spacer này; không chỉ tăng margin thanh tua. Không nhân theo density và không cộng dồn sau remeasure. Honor của chủ repo hiện dùng Android 17/API 37 (đã đọc ADB); kiểm tra SDK 30/35 không thay thế kiểm tra API 37.
 
 Scale thông minh: tính crop từ tỉ lệ luồng gốc và viewport; chỉ crop nếu mất tối đa 16% khung. Video gần vuông/4:3 giữ đủ khung, nền mờ tĩnh lấy từ native cover loader và vẽ vào background component video_container_area, không tạo overlay; chặn callback ảnh bìa cũ sau recycle. Video ngang rộng giữ đường toàn màn hình gốc.
 
