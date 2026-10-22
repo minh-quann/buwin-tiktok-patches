@@ -472,6 +472,13 @@ public final class SeeThroughStatusBar {
         if (wanted && fitWins()) wanted = false;
         ViewGroup group = (ViewGroup) player;
         View surface = findSurface(group);
+        if (app.morphe.extension.tiktok.interaction.NativeLivePreview.keepsNativeLayout(surface)) {
+            // onMeasure kept a native guest/composite slot. The legacy draw fallback must
+            // respect that decision, including when this View was a full-screen host before.
+            grow(surface, 1f);
+            shift(surface, 0f, 0f);
+            return;
+        }
 
         Activity activity = activityOf(player);
         boolean commentsVisible = activity != null && FeedVisibility.isCommentSheetVisible(activity);

@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {30, 35}, manifest = Config.NONE)
+@Config(sdk = {30, 35, 37}, manifest = Config.NONE)
 public class StatusBarVideoFillTest {
     public static class Result {
         final int width, height;
@@ -269,4 +269,66 @@ public class StatusBarVideoFillTest {
             assertEquals(1900, surface.getLayoutParams().height);
         }
     }
+    @Test public void liveGuestTilesAndCompositeKeepNativeGeometryThroughDrawFallback() throws Exception {
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
+            Scene scene = new Scene(controller.get());
+            scene.cell.setId(0x7f0a9ddb);
+            var field = NativeLivePreview.class.getDeclaredField("IDS");
+            field.setAccessible(true);
+            ((app.morphe.extension.shared.ResourceIdCache) field.get(null)).putForTests(
+                    controller.get().getPackageName(), "view_rootview", scene.cell.getId());
+            android.view.SurfaceView surface = new android.view.SurfaceView(controller.get());
+            scene.player.addView(surface, new FrameLayout.LayoutParams(500, 470));
+            layout(scene.content, 1000, 2100);
+            assertEquals(0, NativeLivePreview.measure(surface, 720, 1280));
+            assertTrue(NativeLivePreview.keepsNativeLayout(surface));
+            var fill = SeeThroughStatusBar.class.getDeclaredMethod("fill", View.class, boolean.class);
+            fill.setAccessible(true);
+            fill.invoke(null, scene.player, true);
+            scene.player.getViewTreeObserver().dispatchOnPreDraw();
+            assertEquals(500, surface.getLayoutParams().width);
+            assertEquals(470, surface.getLayoutParams().height);
+            assertEquals(1f, surface.getScaleX(), 0f);
+            assertEquals(0f, surface.getTranslationY(), 0f);
+
+            // A single stream carrying the entire grid can be in a full-width, short slot.
+            surface.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+            scene.player.setLayoutParams(new FrameLayout.LayoutParams(1000, 900));
+            layout(scene.content, 1000, 2100);
+            assertEquals(0, NativeLivePreview.measure(surface, 720, 1280));
+            fill.invoke(null, scene.player, true);
+            assertEquals(1f, surface.getScaleX(), 0f);
+            assertEquals(900, scene.player.getHeight());
+        }
+    }
+
+    @Test public void liveSurfaceRebindRestoresOnlyOurLayoutAndCanFillAgain() throws Exception {
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
+            Scene scene = new Scene(controller.get());
+            scene.cell.setId(0x7f0a9ddb);
+            var field = NativeLivePreview.class.getDeclaredField("IDS");
+            field.setAccessible(true);
+            ((app.morphe.extension.shared.ResourceIdCache) field.get(null)).putForTests(
+                    controller.get().getPackageName(), "view_rootview", scene.cell.getId());
+            View surface = new View(controller.get());
+            scene.player.addView(surface, new FrameLayout.LayoutParams(1000, 1900));
+            layout(scene.content, 1000, 2100);
+            assertTrue(NativeLivePreview.measure(surface, 720, 1280) > 0);
+            assertFalse(NativeLivePreview.keepsNativeLayout(surface));
+            scene.player.setLayoutParams(new FrameLayout.LayoutParams(500, 470));
+            layout(scene.content, 1000, 2100);
+            assertEquals(0, NativeLivePreview.measure(surface, 720, 1280));
+            assertEquals(1900, surface.getLayoutParams().height);
+
+            scene.player.setLayoutParams(new FrameLayout.LayoutParams(1000, 1900));
+            layout(scene.content, 1000, 2100);
+            assertTrue(NativeLivePreview.measure(surface, 720, 1280) > 0);
+            // Native rebind writes a tile's parameters before the next measurement.
+            surface.setLayoutParams(new FrameLayout.LayoutParams(500, 470));
+            assertEquals(0, NativeLivePreview.measure(surface, 720, 1280));
+            assertEquals(500, surface.getLayoutParams().width);
+            assertEquals(470, surface.getLayoutParams().height);
+        }
+    }
+
 }
