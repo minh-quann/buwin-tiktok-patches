@@ -121,8 +121,8 @@ public final class VideoOverlayHider {
      * the bar alone left a thin line across the bottom of each video until then (#84).
      */
     private static final String[] BOTTOM_TABS_DIVIDER_IDS = {"47.4.3:cnj"};
-    /** BaseAutoScrollUIComponent's floating icon and label live outside the video cells. */
-    private static final String[] AUTO_SCROLL_CONTROL_IDS = {"47.4.3:biv", "47.4.3:bj2"};
+    /** Native floating control: bit paints the round background beside the icon/label layer. */
+    private static final String[] AUTO_SCROLL_CONTROL_IDS = {"47.4.3:bit", "47.4.3:biv", "47.4.3:bj2"};
     /**
      * TikTok's loading line, the thin bar along the bottom of each video that grows from the
      * middle while it buffers. With the Clear display controls hidden it was the one bar left at
@@ -2067,7 +2067,7 @@ public final class VideoOverlayHider {
         }
     }
 
-    /** Fade only the native glyph and label; the host keeps ownership of scroll state/touches. */
+    /** Fade the native background, glyph and label siblings once; preserve scroll state/touches. */
     private static void fadeAutoScrollControls(View root) {
         if (root == null) return;
         for (String name : AUTO_SCROLL_CONTROL_IDS) {

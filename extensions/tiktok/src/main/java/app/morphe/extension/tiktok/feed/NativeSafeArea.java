@@ -24,6 +24,7 @@ public final class NativeSafeArea {
     private static final int SEEK_EDGE_INSET_PX = 1;
     private static final int DETAIL_TOP_BAND_PX = DETAIL_SEEK_OFFSET_PX - SEEK_EDGE_INSET_PX;
     private static final ResourceIdCache IDS = new ResourceIdCache();
+    private static final Map<View, int[]> COMMENT_SPECS = new WeakHashMap<>();
     private static final Map<View, int[]> PADDING = new WeakHashMap<>();
     private static final Map<View, int[]> HEIGHTS = new WeakHashMap<>();
     private static final Map<View, java.lang.ref.WeakReference<View>> STRIP_OWNERS = new WeakHashMap<>();
@@ -65,6 +66,35 @@ public final class NativeSafeArea {
     public static void measureCommentSheet(View root) {
         View panel = child(root, "47.4.3:ilv");
         if (panel != null) pad(panel, minimumBottom(root));
+    }
+
+    /**
+     * Keep the drawer's outer height when hiding the navigation reserve changes its incoming
+     * height by just the chin. Real keyboard/window resizing still uses the native constraint;
+     * no padding is retained above the IME and no height is carried across width/mode changes.
+     */
+    public static int commentHeightSpec(View root, int widthSpec, int heightSpec) {
+        int height = View.MeasureSpec.getSize(heightSpec);
+        int mode = View.MeasureSpec.getMode(heightSpec);
+        WindowInsets insets = root.getRootWindowInsets();
+        boolean ime = Build.VERSION.SDK_INT >= 30 && insets != null
+                && insets.isVisible(WindowInsets.Type.ime());
+        if (!SettingsStatus.videoOverlaysEnabled || BuwinPause.isPaused()
+                || SeeThroughBottomBar.isSystemIndicatorActive(root)) {
+            COMMENT_SPECS.remove(root);
+            return heightSpec;
+        }
+        if (!ime) {
+            COMMENT_SPECS.put(root, new int[]{widthSpec, heightSpec});
+            return heightSpec;
+        }
+        int[] previous = COMMENT_SPECS.get(root);
+        if (previous == null || previous[0] != widthSpec
+                || View.MeasureSpec.getMode(previous[1]) != mode || mode == View.MeasureSpec.UNSPECIFIED)
+            return heightSpec;
+        int lost = View.MeasureSpec.getSize(previous[1]) - height;
+        return lost > 0 && lost <= SeeThroughBottomBar.getChinHeight(root.getContext())
+                ? previous[1] : heightSpec;
     }
 
     /** Shared Material bottom-sheet behavior also covers sheets outside the comment screen. */

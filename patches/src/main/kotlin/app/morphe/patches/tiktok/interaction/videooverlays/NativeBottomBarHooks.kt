@@ -325,6 +325,9 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
                 existing.addInstructions(0, call + if (hook == "measureDetailInput") """
                     invoke-static { p0, p2 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->detailHeightSpec(Landroid/view/View;I)I
                     move-result p2
+                """ else if (hook == "measureCommentSheet") """
+                    invoke-static { p0, p1, p2 }, Lapp/morphe/extension/tiktok/feed/NativeSafeArea;->commentHeightSpec(Landroid/view/View;II)I
+                    move-result p2
                 """ else "")
             }
             else view.methods.add(nativeOverride(type, "onMeasure", listOf("I", "I"), 3, """

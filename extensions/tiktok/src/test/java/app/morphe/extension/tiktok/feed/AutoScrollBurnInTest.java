@@ -27,7 +27,7 @@ import org.robolectric.annotation.GraphicsMode;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {30, 35}, manifest = Config.NONE)
+@Config(sdk = {30, 35, 37}, manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class AutoScrollBurnInTest {
     @Test public void floatingIconAndLabelDimOutsideCellsAndRestoreOnTouch() {
@@ -40,21 +40,27 @@ public class AutoScrollBurnInTest {
             Settings.BURN_IN_IDLE_LEVEL.save(25);
             Settings.BURN_IN_GUARD.save(BurnInGuard.DIM);
             FrameLayout root = new FrameLayout(activity);
-            View icon = new View(activity), label = new View(activity);
+            View icon = new View(activity), label = new View(activity), background = new View(activity);
+            background.setId(0x7f0a0894);
+            background.setBackgroundColor(Color.GRAY);
+            root.addView(background);
             icon.setId(0x7f0a0896);
             label.setId(0x7f0a089d);
             root.addView(icon);
             root.addView(label);
             activity.setContentView(root);
+            VideoOverlayHider.resolveForTests("47.4.3:bit", background.getId());
             VideoOverlayHider.resolveForTests("47.4.3:biv", icon.getId());
             VideoOverlayHider.resolveForTests("47.4.3:bj2", label.getId());
             VideoOverlayHider.applyTo(activity);
             ShadowLooper main = Shadow.extract(Looper.getMainLooper());
             main.idleFor(Duration.ofMillis(BurnInGuard.IDLE_AFTER_MS));
+            assertEquals(0.25f, background.getAlpha(), 0.001f);
             assertEquals(0.25f, icon.getAlpha(), 0.001f);
             assertEquals(0.25f, label.getAlpha(), 0.001f);
             activity.getWindow().getCallback().onWindowFocusChanged(true);
             main.idle();
+            assertEquals(1f, background.getAlpha(), 0f);
             assertEquals(1f, icon.getAlpha(), 0f);
             assertEquals(1f, label.getAlpha(), 0f);
         } finally {
@@ -62,6 +68,7 @@ public class AutoScrollBurnInTest {
             Settings.BURN_IN_IDLE_LEVEL.resetToDefault();
             SettingsStatus.videoOverlaysEnabled = false;
             BurnInGuard.resetForTests();
+            VideoOverlayHider.resolveForTests("47.4.3:bit", 0);
             VideoOverlayHider.resolveForTests("47.4.3:biv", 0);
             VideoOverlayHider.resolveForTests("47.4.3:bj2", 0);
         }

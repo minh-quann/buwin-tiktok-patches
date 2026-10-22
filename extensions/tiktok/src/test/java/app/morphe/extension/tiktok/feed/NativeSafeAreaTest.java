@@ -59,6 +59,31 @@ public class NativeSafeAreaTest {
         assertEquals(chin, chat.getPaddingBottom());
     }
 
+    @Test public void commentDrawerDoesNotLoseChinHeightWhenImeOpens() {
+        Root drawer = new Root(Utils.getContext());
+        int chin = SeeThroughBottomBar.getChinHeight(drawer.getContext());
+        int width = View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY);
+        int closed = View.MeasureSpec.makeMeasureSpec(2700, View.MeasureSpec.EXACTLY);
+        assertEquals(closed, NativeSafeArea.commentHeightSpec(drawer, width, closed));
+        drawer.insets = new WindowInsets.Builder().setInsets(WindowInsets.Type.ime(), Insets.of(0, 0, 0, 900))
+                .setVisible(WindowInsets.Type.ime(), true).build();
+        int opened = View.MeasureSpec.makeMeasureSpec(2700 - chin, View.MeasureSpec.EXACTLY);
+        for (int i = 0; i < 4; i++) {
+            assertEquals(closed, NativeSafeArea.commentHeightSpec(drawer, width, opened));
+            assertEquals(0, NativeSafeArea.minimumBottom(drawer));
+        }
+        // A real keyboard resize, rotation or change of constraint must remain native.
+        int resized = View.MeasureSpec.makeMeasureSpec(1800, View.MeasureSpec.EXACTLY);
+        assertEquals(resized, NativeSafeArea.commentHeightSpec(drawer, width, resized));
+        int rotated = View.MeasureSpec.makeMeasureSpec(2700, View.MeasureSpec.EXACTLY);
+        assertEquals(opened, NativeSafeArea.commentHeightSpec(drawer, rotated, opened));
+        int atMost = View.MeasureSpec.makeMeasureSpec(2700 - chin, View.MeasureSpec.AT_MOST);
+        assertEquals(atMost, NativeSafeArea.commentHeightSpec(drawer, width, atMost));
+        drawer.insets = new WindowInsets.Builder().build();
+        assertEquals(closed, NativeSafeArea.commentHeightSpec(drawer, width, closed));
+        assertEquals(chin, NativeSafeArea.minimumBottom(drawer));
+    }
+
     @Test public void nestedSheetNeverAddsTheSameSafeAreaTwice() {
         Root sheet = new Root(Utils.getContext());
         Root chat = new Root(Utils.getContext());
