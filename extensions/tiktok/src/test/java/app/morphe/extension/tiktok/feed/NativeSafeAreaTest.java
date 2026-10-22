@@ -26,6 +26,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {30, 35, 37}, manifest = Config.NONE)
@@ -33,6 +34,11 @@ public class NativeSafeAreaTest {
     static class Root extends FrameLayout {
         WindowInsets insets = new WindowInsets.Builder().build();
         Root(Context context) { super(context); }
+        @Override public WindowInsets getRootWindowInsets() { return insets; }
+    }
+    static class Keyboard extends LinearLayout {
+        WindowInsets insets = new WindowInsets.Builder().build();
+        Keyboard(Context context) { super(context); setOrientation(VERTICAL); }
         @Override public WindowInsets getRootWindowInsets() { return insets; }
     }
     @Before public void setup() {
@@ -154,12 +160,14 @@ public class NativeSafeAreaTest {
             View caption = new View(activity);
             FrameLayout.LayoutParams captionParams = new FrameLayout.LayoutParams(-1, 245, Gravity.BOTTOM);
             captionParams.bottomMargin = 151; widgets.addView(caption, captionParams);
-            Root composer = new Root(activity); composer.setId(0x7f0a59aa);
+            Keyboard composer = new Keyboard(activity); composer.setId(0x7f0a59aa);
             LinearLayout footer = new LinearLayout(activity); footer.setOrientation(LinearLayout.VERTICAL); footer.setId(0x7f0a1b82);
-            footer.addView(new View(activity), new LinearLayout.LayoutParams(-1, 2));
+            View divider = new View(activity); divider.setId(0x7f0a8213);
+            footer.addView(divider, new LinearLayout.LayoutParams(-1, 2));
             View input = new View(activity); footer.addView(input, new LinearLayout.LayoutParams(-1, 158));
-            composer.addView(footer, new FrameLayout.LayoutParams(-1, -2));
-            window.addView(composer, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+            composer.addView(new View(activity), new LinearLayout.LayoutParams(-1, 0, 1));
+            composer.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+            window.addView(composer, new FrameLayout.LayoutParams(-1, -1));
             FrameLayout seekSlot = new FrameLayout(activity); seekSlot.setId(0x7f0a74c2);
             View seek = new View(activity); seek.setId(0x7f0a9cc5); seekSlot.addView(seek, new FrameLayout.LayoutParams(-1, 90));
             window.addView(seekSlot, new FrameLayout.LayoutParams(-1, 206, Gravity.BOTTOM));
@@ -171,6 +179,7 @@ public class NativeSafeAreaTest {
             ids.putForTests(pkg, "47.4.3:f2t", footer.getId());
             ids.putForTests(pkg, "47.4.3:cnc", strip.getId());
             ids.putForTests(pkg, "47.4.3:vrd", seekSlot.getId());
+            ids.putForTests(pkg, "47.4.3:y9i", divider.getId());
             ids.putForTests(pkg, "viewpager_container", column.getId());
             ids.putForTests(pkg, "video_seek_bar", 0x7f0a9cc5);
             int chin = SeeThroughBottomBar.getChinHeight(activity);
@@ -178,12 +187,15 @@ public class NativeSafeAreaTest {
             measureWindow(window);
             NativeSafeArea.finishDetailInput(composer);
             measureWindow(window);
-            int expectedHeight = 160 + chin;
-            assertEquals(expectedHeight, composer.getHeight());
-            assertEquals(expectedHeight + 15, strip.getLayoutParams().height);
-            assertEquals(composer.getTop() - 15, cell.getBottom());
+            int expectedHeight = 160 + chin + 15;
+            assertEquals(expectedHeight, footer.getHeight());
+            assertEquals(window.getHeight(), composer.getHeight());
+            assertEquals(expectedHeight - 2, strip.getLayoutParams().height);
+            assertEquals(composer.getTop() + footer.getTop() + 2, cell.getBottom());
             assertEquals(cell.getBottom() + 1, widgets.getTop() + caption.getBottom());
-            assertEquals(composer.getTop() - 16, seekSlot.getTop() + seek.getHeight() / 2);
+            assertEquals(composer.getTop() + footer.getTop() + divider.getHeight() / 2, seekSlot.getTop() + seek.getHeight() / 2);
+            assertEquals(16, input.getTop() - divider.getHeight() / 2);
+            assertEquals(15, ((LinearLayout.LayoutParams) divider.getLayoutParams()).bottomMargin);
             assertEquals(strip.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
             // Native screen adaption can overwrite its strip without remeasuring the input.
             for (int i = 0; i < 4; i++) {
@@ -192,9 +204,11 @@ public class NativeSafeAreaTest {
                 NativeSafeArea.measureDetailInput(composer);
                 NativeSafeArea.finishDetailInput(composer);
                 measureWindow(window);
-                assertEquals(expectedHeight + 15, strip.getLayoutParams().height);
-                assertEquals(composer.getTop() - 15, cell.getBottom());
-                assertEquals(composer.getTop() - 16, seekSlot.getTop() + seek.getHeight() / 2);
+                assertEquals(expectedHeight - 2, strip.getLayoutParams().height);
+                assertEquals(composer.getTop() + footer.getTop() + 2, cell.getBottom());
+                assertEquals(composer.getTop() + footer.getTop() + divider.getHeight() / 2, seekSlot.getTop() + seek.getHeight() / 2);
+                assertEquals(16, input.getTop() - divider.getHeight() / 2);
+                assertEquals(15, ((LinearLayout.LayoutParams) divider.getLayoutParams()).bottomMargin);
                 assertEquals(strip.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
             }
             composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
@@ -202,6 +216,7 @@ public class NativeSafeAreaTest {
             assertEquals(158, strip.getLayoutParams().height);
             assertEquals(0, ((FrameLayout.LayoutParams) seekSlot.getLayoutParams()).bottomMargin);
             NativeSafeArea.releaseDetailInput(composer);
+            assertEquals(0, ((LinearLayout.LayoutParams) divider.getLayoutParams()).bottomMargin);
             ids.clear();
         }
     }
@@ -300,4 +315,44 @@ public class NativeSafeAreaTest {
                 View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
         window.layout(0, 0, 1320, 2868);
     }
+
+    @Test public void searchRebindKeepsRelatedQueryAndCaptionAboveDetailFooter() throws Exception {
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.detail.ui.DetailActivity.class).setup()) {
+            Activity activity = controller.get();
+            FrameLayout cell = new FrameLayout(activity);
+            android.widget.RelativeLayout widgets = new android.widget.RelativeLayout(activity);
+            widgets.setId(0x7f0aa089);
+            FrameLayout.LayoutParams widgetParams = new FrameLayout.LayoutParams(-1, -1);
+            widgetParams.bottomMargin = -152;
+            cell.addView(widgets, widgetParams);
+            View query = new View(activity); query.setId(0x7f0a3e20);
+            android.widget.RelativeLayout.LayoutParams queryParams = new android.widget.RelativeLayout.LayoutParams(-1, 100);
+            queryParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_BOTTOM);
+            widgets.addView(query, queryParams);
+            View caption = new View(activity);
+            android.widget.RelativeLayout.LayoutParams captionParams = new android.widget.RelativeLayout.LayoutParams(-1, 200);
+            captionParams.addRule(android.widget.RelativeLayout.ABOVE, query.getId());
+            widgets.addView(caption, captionParams);
+            activity.setContentView(cell);
+            var cacheField = NativeBottomBar.class.getDeclaredField("IDS"); cacheField.setAccessible(true);
+            ResourceIdCache cache = (ResourceIdCache) cacheField.get(null);
+            String pkg = activity.getPackageName();
+            cache.putForTests(pkg, "widget_container", widgets.getId());
+            cache.putForTests(pkg, "47.4.3:ljb", query.getId());
+            for (int i = 0; i < 4; i++) {
+                // Screen adaption/rebind can remove the query's compensating bottom margin.
+                queryParams.bottomMargin = 0;
+                widgetParams.bottomMargin = -152 - i * 10;
+                NativeBottomBar.measureCell(cell);
+                measureWindow(cell);
+                assertEquals(cell.getHeight() - 1, widgets.getTop() + query.getBottom());
+                assertEquals(query.getTop(), caption.getBottom());
+                assertTrue(widgets.getTop() + caption.getBottom() < cell.getHeight());
+            }
+            query.setVisibility(View.GONE);
+            NativeBottomBar.measureCell(cell);
+            assertEquals(0, queryParams.bottomMargin);
+        }
+    }
+
 }

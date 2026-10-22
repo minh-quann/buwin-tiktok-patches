@@ -24,6 +24,7 @@ public final class NativeSafeArea {
     private static final int SEEK_EDGE_INSET_PX = 1;
     private static final int DETAIL_TOP_BAND_PX = DETAIL_SEEK_OFFSET_PX - SEEK_EDGE_INSET_PX;
     private static final ResourceIdCache IDS = new ResourceIdCache();
+    private static final Map<View, int[]> DIVIDER_GAPS = new WeakHashMap<>();
     private static final Map<View, int[]> COMMENT_SPECS = new WeakHashMap<>();
     private static final Map<View, int[]> PADDING = new WeakHashMap<>();
     private static final Map<View, int[]> HEIGHTS = new WeakHashMap<>();
@@ -145,6 +146,10 @@ public final class NativeSafeArea {
         if (footer == null) footer = child(root, "47.4.3:udg");
         if (footer == null || footer == root) return;
         int added = pad(footer, minimumBottom(root));
+        View divider = child(footer, "47.4.3:y9i");
+        boolean alignDivider = divider != null && divider.getVisibility() == View.VISIBLE
+                && divider.getLayoutParams() instanceof ViewGroup.MarginLayoutParams;
+        if (divider != null) gapBelowDivider(divider, added > 0 && alignDivider ? DETAIL_TOP_BAND_PX : 0);
         // Quick DM sets udk to a fixed 49dp in onViewCreated. Its MATCH_PARENT input
         // is otherwise squeezed by precisely the new padding (158 -> 86px on Honor).
         if (child(root, "47.4.3:udg") == footer) resizeFixedComposer(root, added);
@@ -182,11 +187,25 @@ public final class NativeSafeArea {
                 // The measured native input is the boundary, even when smaller than the
                 // strip TikTok just wrote. Carry it across measure entry too: otherwise each
                 // pass alternates between base+extra and the actual input height.
-                if (measured && root.getMeasuredHeight() > 0) measuredReserve = root.getMeasuredHeight();
-                else if (held != null && held.length > 3 && held[2] == extra) measuredReserve = held[3];
+                if (measured && root.getMeasuredHeight() > 0) {
+                    measuredReserve = root.getMeasuredHeight();
+                    if (alignDivider && footer.getMeasuredHeight() > 0) {
+                        ViewGroup.MarginLayoutParams line = (ViewGroup.MarginLayoutParams) divider.getLayoutParams();
+                        int center = footer.getPaddingTop() + line.topMargin + divider.getMeasuredHeight() / 2;
+                        // The keyboard root can fill the whole window with a weighted spacer.
+                        // Only its bottom footer reserves video space. Share the native divider's
+                        // center with the seek track; the black boundary sits one pixel below it.
+                        measuredReserve = footer.getMeasuredHeight() + root.getPaddingBottom()
+                                - center - SEEK_EDGE_INSET_PX;
+                        band = 0; // The gap already lives inside the measured native footer.
+                    }
+                } else if (held != null && held.length > 3 && held[2] == extra) {
+                    measuredReserve = held[3];
+                    if (alignDivider && measuredReserve > 0) band = 0;
+                }
                 if (measuredReserve > 0) height = measuredReserve + band;
             }
-            paintDetailStrip(strip, band > 0);
+            paintDetailStrip(strip, extra > 0);
             HEIGHTS.put(strip, new int[]{base, height, extra, measuredReserve});
             STRIP_OWNERS.put(strip, new java.lang.ref.WeakReference<>(root));
             if (params.height != height) {
@@ -195,6 +214,21 @@ public final class NativeSafeArea {
             }
             moveDetailSeek(window, strip.getVisibility() == View.GONE ? 0 : extra,
                     strip.getVisibility() == View.GONE ? 0 : height);
+        }
+    }
+
+    /** Grow the native footer above its input row, keeping the input's bottom position intact. */
+    private static void gapBelowDivider(View divider, int gap) {
+        if (!(divider.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) divider.getLayoutParams();
+        int[] held = DIVIDER_GAPS.get(divider);
+        int base = held != null && params.bottomMargin == held[1] ? held[0] : params.bottomMargin;
+        int bottom = base + gap;
+        if (gap == 0) DIVIDER_GAPS.remove(divider);
+        else DIVIDER_GAPS.put(divider, new int[]{base, bottom});
+        if (params.bottomMargin != bottom) {
+            params.bottomMargin = bottom;
+            divider.setLayoutParams(params);
         }
     }
 
@@ -258,6 +292,8 @@ public final class NativeSafeArea {
     }
 
     public static void releaseDetailInput(View root) {
+        View divider = child(root, "47.4.3:y9i");
+        if (divider != null) gapBelowDivider(divider, 0);
         boolean released = false;
         for (View strip : new java.util.ArrayList<>(STRIP_OWNERS.keySet())) {
             java.lang.ref.WeakReference<View> owner = STRIP_OWNERS.get(strip);

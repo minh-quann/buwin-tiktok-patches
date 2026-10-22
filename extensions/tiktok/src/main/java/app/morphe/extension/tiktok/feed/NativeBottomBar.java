@@ -25,6 +25,7 @@ public final class NativeBottomBar {
     private static final ResourceIdCache IDS = new ResourceIdCache();
     private static final Map<View, WeakReference<View>> DIVIDERS = new WeakHashMap<>();
     private static final Map<View, int[]> MARGINS = new WeakHashMap<>();
+    private static final Map<View, int[]> SEARCH_MARGINS = new WeakHashMap<>();
     private static final Map<View, int[]> SEEK_MARGINS = new WeakHashMap<>();
     private static final Map<View, Drawable> CLEAR_BACKGROUNDS = new WeakHashMap<>();
     private NativeBottomBar() {}
@@ -113,7 +114,37 @@ public final class NativeBottomBar {
         int id = IDS.resolve(cell.getResources(), cell.getContext().getPackageName(), "widget_container", false);
         if (id == 0) return;
         View widgets = cell.findViewById(id);
-        if (widgets != null) moveMargins(widgets, reserve(tabs(cell)));
+        if (widgets != null) {
+            moveMargins(widgets, reserve(tabs(cell)));
+            keepDetailSearchAboveFooter(cell, widgets);
+        }
+    }
+
+    /**
+     * The native widget root extends below the pager by a negative bottom margin. Its search
+     * row normally cancels that offset with its own margin, but rebinds can reset the row to
+     * zero. Restore that constraint before measuring: native siblings anchored above the row
+     * (caption, subtitles and action rail) then move with it, including preloaded search cells.
+     */
+    private static void keepDetailSearchAboveFooter(View cell, View widgets) {
+        int id = IDS.resolve(cell.getResources(), cell.getContext().getPackageName(), "47.4.3:ljb", false);
+        View search = id == 0 ? null : widgets.findViewById(id);
+        if (search == null || search.getParent() != widgets
+                || !(search.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)
+                || !(widgets.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) search.getLayoutParams();
+        int[] held = SEARCH_MARGINS.get(search);
+        int base = held != null && params.bottomMargin == held[1] ? held[0] : params.bottomMargin;
+        boolean active = enabled() && app.morphe.extension.tiktok.blockauthor.FeedVisibility
+                .isDetailPager(SeeThroughStatusBar.activityOf(cell)) && search.getVisibility() == View.VISIBLE;
+        int overflow = Math.max(0, -((ViewGroup.MarginLayoutParams) widgets.getLayoutParams()).bottomMargin);
+        int bottom = active ? Math.max(base, overflow + 1) : base;
+        if (active) SEARCH_MARGINS.put(search, new int[]{base, bottom});
+        else SEARCH_MARGINS.remove(search);
+        if (params.bottomMargin != bottom) {
+            params.bottomMargin = bottom;
+            search.setLayoutParams(params);
+        }
     }
 
     /** LIVE uses an ordinary FrameLayout cell and its own commerce/tips constraint group. */
