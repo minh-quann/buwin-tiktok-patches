@@ -16,6 +16,8 @@ import app.morphe.extension.tiktok.settings.SettingsStatus;
 
 /** Shared bottom-safe-area policy consumed by the original keyboard and sheet components. */
 public final class NativeSafeArea {
+    /** Physical pixels above the input edge, independent of display density. */
+    private static final int DETAIL_SEEK_GAP_PX = 12;
     private static final ResourceIdCache IDS = new ResourceIdCache();
     private static final Map<View, int[]> PADDING = new WeakHashMap<>();
     private static final Map<View, int[]> HEIGHTS = new WeakHashMap<>();
@@ -189,9 +191,10 @@ public final class NativeSafeArea {
             int trackHeight = track.getMeasuredHeight();
             if (slotHeight > 0 && trackHeight > 0) {
                 // The touch row is shorter than the 206px seek slot. Anchoring the entire
-                // slot above the input puts the real line through captions instead of its edge.
+                // slot above the input puts the real line through captions. Anchor the track
+                // itself, leaving a small physical-pixel gap above the input's upper edge.
                 targetTop = top;
-                targetBottom = reserve + track.getTop() + trackHeight / 2 - slotHeight + 1;
+                targetBottom = reserve + track.getTop() + trackHeight / 2 - slotHeight + DETAIL_SEEK_GAP_PX;
             }
         }
         SEEK_MARGINS.put(slot, new int[]{top, bottom, extra, targetTop, targetBottom});

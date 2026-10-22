@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {30, 35}, manifest = Config.NONE)
+@Config(sdk = {30, 35, 37}, manifest = Config.NONE)
 public class NativeSafeAreaTest {
     static class Root extends FrameLayout {
         WindowInsets insets = new WindowInsets.Builder().build();
@@ -156,7 +156,7 @@ public class NativeSafeAreaTest {
             assertEquals(expectedHeight, strip.getLayoutParams().height);
             assertEquals(composer.getTop(), cell.getBottom());
             assertEquals(composer.getTop() + 1, widgets.getTop() + caption.getBottom());
-            assertEquals(composer.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
+            assertEquals(composer.getTop() - 12, seekSlot.getTop() + seek.getHeight() / 2);
             // Native screen adaption can overwrite its strip without remeasuring the input.
             for (int i = 0; i < 4; i++) {
                 strip.getLayoutParams().height = 158;
@@ -166,7 +166,7 @@ public class NativeSafeAreaTest {
                 measureWindow(window);
                 assertEquals(expectedHeight, strip.getLayoutParams().height);
                 assertEquals(composer.getTop(), cell.getBottom());
-                assertEquals(composer.getTop() - 1, seekSlot.getTop() + seek.getHeight() / 2);
+                assertEquals(composer.getTop() - 12, seekSlot.getTop() + seek.getHeight() / 2);
             }
             composer.insets = new WindowInsets.Builder().setVisible(WindowInsets.Type.ime(), true).build();
             NativeSafeArea.measureDetailPage(window);
@@ -246,7 +246,7 @@ public class NativeSafeAreaTest {
                 measureWindow(window);
                 assertEquals(expected, strip.getLayoutParams().height);
                 assertEquals(composer.getTop(), cell.getBottom());
-                assertEquals(composer.getTop() - 1, seekSlot.getTop() + track.getHeight() / 2);
+                assertEquals(composer.getTop() - 12, seekSlot.getTop() + track.getHeight() / 2);
                 // Entry of the next pass must not grow it again before finishDetailInput.
                 NativeSafeArea.measureDetailInput(composer);
                 assertEquals(expected, strip.getLayoutParams().height);

@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {30, 35}, qualifiers = "w1320dp-h2868dp-mdpi", manifest = Config.NONE)
+@Config(sdk = {30, 35, 37}, qualifiers = "w1320dp-h2868dp-mdpi", manifest = Config.NONE)
 public class MessageVideoPageTest {
     public static class Edge {
         final View view;
