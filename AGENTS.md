@@ -42,3 +42,5 @@ Thanh tua phải neo sát mép trên vùng đen (tâm đường tua cách mép 1
 Scale thông minh: tính crop từ tỉ lệ luồng gốc và viewport; chỉ crop nếu mất tối đa 16% khung. Video gần vuông/4:3 giữ đủ khung, nền mờ tĩnh lấy từ native cover loader và vẽ vào background component video_container_area, không tạo overlay; chặn callback ảnh bìa cũ sau recycle. Video ngang rộng giữ đường toàn màn hình gốc.
 
 Pager ảnh PhotoSlideViewPagerComponent/0EAS không được đi qua scale video, listener đợi đo video hoặc fallback scale cả ViewGroup. Slider dùng IntegerSetting lưu chuỗi, tuyệt đối không persistInt cùng key; 0% phải lưu và mở lại được.
+
+Burn-in/fade 0% là alpha=0, không phải GONE/INVISIBLE và không kích hoạt Clear display. Giữ nguyên visibility native, kích thước, margins, vị trí caption/thanh tua/composer, nền đen bottom tabs và viewport fill status bar như ở 1%; chỉ foreground được trong suốt. Các switch ẩn riêng hoặc Clear display thật vẫn theo chính sách riêng.

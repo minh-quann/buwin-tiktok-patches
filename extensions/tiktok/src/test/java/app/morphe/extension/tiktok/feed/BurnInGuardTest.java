@@ -320,6 +320,75 @@ public class BurnInGuardTest {
         }
     }
 
+    @Test
+    public void zeroOpacityKeepsFeedSelectionNativeGeometryAndStatusFillExactlyLikeOnePercent() {
+        final int barId = 0x7f0a4ecc, homeId = 0x7f0a4ec3, captionId = 0x7f0a01a1;
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
+            activity = controller.get(); Utils.setContext(activity);
+            String pkg = activity.getPackageName();
+            app.morphe.extension.tiktok.blockauthor.FeedVisibility.resolveForTests(pkg, "47.4.3:onh", homeId);
+            VideoOverlayHider.resolveForTests("47.4.3:onp", barId);
+            VideoOverlayHider.resolveForTests("47.4.3:bqr", captionId);
+            Settings.BURN_IN_GUARD.save(BurnInGuard.DIM);
+            Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SCALE);
+            Settings.FIT_VIDEO_TO_SCREEN.save(false);
+            FrameLayout root = new FrameLayout(activity), cell = new FrameLayout(activity);
+            cell.setId(CELL_ID); root.addView(cell, new FrameLayout.LayoutParams(-1,-1));
+            View player = new View(activity);
+            cell.addView(player, new FrameLayout.LayoutParams(720,1440));
+            View rail = new View(activity); rail.setId(COLUMN_ID);
+            cell.addView(rail, new FrameLayout.LayoutParams(150,600, android.view.Gravity.RIGHT | android.view.Gravity.BOTTOM));
+            View caption = new View(activity); caption.setId(captionId);
+            FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(900,300, android.view.Gravity.BOTTOM);
+            cp.bottomMargin = 230; cell.addView(caption,cp);
+            FrameLayout bar = new FrameLayout(activity); bar.setId(barId);
+            View home = new View(activity); home.setId(homeId); home.setSelected(true);
+            bar.addView(home,new FrameLayout.LayoutParams(200,158));
+            root.addView(bar,new FrameLayout.LayoutParams(-1,230,android.view.Gravity.BOTTOM));
+            activity.setContentView(root);
+            View content = activity.findViewById(android.R.id.content);
+            measureFeed(content);
+            SeeThroughBottomBar.adjustBottomBarChin(bar);
+            VideoOverlayHider.applyTo(activity);
+            var source = new app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result(720,1440);
+            var baseline = (app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result)
+                    app.morphe.extension.tiktok.interaction.VideoFit.fitted(player,source);
+            int railTop = rail.getTop(), captionTop = caption.getTop(), barTop = bar.getTop();
+            for (int level : new int[]{1,0,1,0}) {
+                Settings.BURN_IN_IDLE_LEVEL.save(level);
+                touch(); VideoOverlayHider.applyTo(activity); after(BurnInGuard.IDLE_AFTER_MS);
+                for (int repeat = 0; repeat < 3; repeat++) {
+                    VideoOverlayHider.applyTo(activity); measureFeed(content);
+                    assertEquals(View.VISIBLE,bar.getVisibility());
+                    assertEquals(View.VISIBLE,rail.getVisibility());
+                    assertEquals(View.VISIBLE,caption.getVisibility());
+                    assertEquals(level / 100f,rail.getAlpha(),.0001f);
+                    assertEquals(level / 100f,caption.getAlpha(),.0001f);
+                    assertEquals(level == 0 ? 0f : VideoOverlayHider.NAVIGATION_FADE_FLOOR / 100f,home.getAlpha(),.0001f);
+                    assertEquals(1f,bar.getAlpha(),0f);
+                    assertEquals(android.graphics.Color.BLACK,((android.graphics.drawable.ColorDrawable)bar.getBackground()).getColor());
+                    assertTrue(app.morphe.extension.tiktok.blockauthor.FeedVisibility.isOnFeed(activity));
+                    assertTrue(SeeThroughStatusBar.wantsNativeFill(player));
+                    assertEquals(railTop,rail.getTop()); assertEquals(captionTop,caption.getTop()); assertEquals(barTop,bar.getTop());
+                    var next = (app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result)
+                            app.morphe.extension.tiktok.interaction.VideoFit.fitted(player,source);
+                    assertEquals(baseline.getWidth(),next.getWidth()); assertEquals(baseline.getHeight(),next.getHeight());
+                    assertEquals(baseline.getTranslateX(),next.getTranslateX()); assertEquals(baseline.getTranslateY(),next.getTranslateY());
+                }
+            }
+            app.morphe.extension.tiktok.blockauthor.FeedVisibility.resolveForTests(pkg,"47.4.3:onh",0);
+        } finally {
+            VideoOverlayHider.resolveForTests("47.4.3:onp",0);
+            VideoOverlayHider.resolveForTests("47.4.3:bqr",0);
+        }
+    }
+
+    private static void measureFeed(View view) {
+        view.measure(View.MeasureSpec.makeMeasureSpec(1320,View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(2868,View.MeasureSpec.EXACTLY));
+        view.layout(0,0,1320,2868);
+    }
+
     private static void assertAt(View content, float step) {
         int[] at = BurnInGuard.placeAt(SystemClock.uptimeMillis());
         assertEquals(at[0] * step, content.getTranslationX(), 0.0001f);

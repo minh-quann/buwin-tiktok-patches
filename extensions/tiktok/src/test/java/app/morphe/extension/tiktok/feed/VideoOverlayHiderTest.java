@@ -2939,6 +2939,7 @@ public class VideoOverlayHiderTest {
     }
 
     @Test
+    @Config(sdk = {30, 35})
     public void fadingTheControlsKeepsThemTouchableAndSetsTheirOpacity() {
         resolveFadeIds();
         boolean overlays = app.morphe.extension.tiktok.settings.SettingsStatus.videoOverlaysEnabled;
@@ -2974,10 +2975,9 @@ public class VideoOverlayHiderTest {
 
             Settings.FADE_CONTROLS_OPACITY.save(0);
             VideoOverlayHider.applyTo(activity);
-            assertEquals("0 hides the column the way Clear display does",
-                    View.GONE, column.getVisibility());
-            assertEquals("the tabs never fade below the floor",
-                    VideoOverlayHider.NAVIGATION_FADE_FLOOR / 100f, tabs.getAlpha(), 0.0001f);
+            assertEquals("0 keeps the column in layout", View.VISIBLE, column.getVisibility());
+            assertEquals(0f, column.getAlpha(), 0f);
+            assertEquals("0 makes only the foreground transparent", 0f, tabs.getAlpha(), 0f);
             assertEquals(View.VISIBLE, tabs.getVisibility());
 
             Settings.FADE_CONTROLS_OPACITY.save(100);
@@ -2997,6 +2997,7 @@ public class VideoOverlayHiderTest {
      * column alone left the caption and the disc at full opacity (S22, 2026-10-08).
      */
     @Test
+    @Config(sdk = {30, 35})
     public void theCaptionFrameAndMusicDiscFadeBesideTheColumn() {
         int column471 = 0x7f0a0d11, frame471 = 0x7f0a0d12, disc = 0x7f0a0d13;
         resolveFadeIds();
@@ -3034,9 +3035,10 @@ public class VideoOverlayHiderTest {
 
             Settings.FADE_CONTROLS_OPACITY.save(0);
             VideoOverlayHider.applyTo(activity);
-            assertEquals(View.GONE, column.getVisibility());
-            assertEquals("0 takes the caption away without moving it", View.INVISIBLE, frame.getVisibility());
-            assertEquals(View.INVISIBLE, cover.getVisibility());
+            for (View view : new View[]{column, frame, cover}) {
+                assertEquals("0 keeps the native layout", View.VISIBLE, view.getVisibility());
+                assertEquals(0f, view.getAlpha(), 0f);
+            }
 
             Settings.FADE_CONTROLS_OPACITY.save(100);
             VideoOverlayHider.applyTo(activity);
@@ -3061,6 +3063,7 @@ public class VideoOverlayHiderTest {
      * without moving the caption above it.
      */
     @Test
+    @Config(sdk = {30, 35})
     public void theSearchBarUnderTheCaptionFadesAndLeavesWithClearDisplay() {
         int barId = 0x7f0a0d15;
         resolveFadeIds();
@@ -3087,7 +3090,8 @@ public class VideoOverlayHiderTest {
 
             Settings.FADE_CONTROLS_OPACITY.save(0);
             VideoOverlayHider.applyTo(activity);
-            assertEquals("0 takes it away without moving the caption", View.INVISIBLE, bar.getVisibility());
+            assertEquals("0 keeps the search bar in layout", View.VISIBLE, bar.getVisibility());
+            assertEquals(0f, bar.getAlpha(), 0f);
 
             Settings.FADE_CONTROLS_OPACITY.save(100);
             VideoOverlayHider.applyTo(activity);
@@ -3311,6 +3315,7 @@ public class VideoOverlayHiderTest {
      * floor, and in the faded Clear display they show at the chosen level.
      */
     @Test
+    @Config(sdk = {30, 35})
     public void theSearchBarAcrossTheTopOfAnOpenedVideoFades() {
         int barId = 0x7f0a0e02;
         int scrimId = 0x7f0a0e03;
@@ -3339,7 +3344,7 @@ public class VideoOverlayHiderTest {
 
             Settings.FADE_CONTROLS_OPACITY.save(0);
             VideoOverlayHider.applyTo(activity);
-            assertEquals("never past the floor", 0.1f, bar.getAlpha(), 0.0001f);
+            assertEquals("0 is fully transparent", 0f, bar.getAlpha(), 0f);
             assertEquals(View.VISIBLE, bar.getVisibility());
 
             // Faded Clear display: TikTok left the bar at 0.5, and it shows at the level.
@@ -3493,6 +3498,7 @@ public class VideoOverlayHiderTest {
      * of sight at 0 without moving what is beside it, and comes back at 100.
      */
     @Test
+    @Config(sdk = {30, 35})
     public void theFullScreenButtonFadesWithTheControls() {
         boolean overlays = app.morphe.extension.tiktok.settings.SettingsStatus.videoOverlaysEnabled;
         app.morphe.extension.tiktok.settings.SettingsStatus.videoOverlaysEnabled = true;
@@ -3523,7 +3529,8 @@ public class VideoOverlayHiderTest {
                     .rememberClearDisplayEvent(new ClearEvent(false, 2));
             Settings.FADE_CONTROLS_OPACITY.save(0);
             VideoOverlayHider.applyTo(activity);
-            assertEquals(View.INVISIBLE, entry.getVisibility());
+            assertEquals(View.VISIBLE, entry.getVisibility());
+            assertEquals(0f, entry.getAlpha(), 0f);
             assertFalse(TapThroughControls.isMarked(entry));
 
             Settings.FADE_CONTROLS_OPACITY.save(100);
@@ -3542,9 +3549,10 @@ public class VideoOverlayHiderTest {
     /**
      * Classic Clear display takes the Add comment bar and its strip off an opened video. The faded
      * one keeps the bar in sight at the chosen level instead (the strip stays, so the pager keeps
-     * its height), the fade fades it outside Clear display too, and a fade of 0 takes both away.
+     * its height), the fade fades it outside Clear display too, and 0 keeps both in layout with transparent controls.
      */
     @Test
+    @Config(sdk = {30, 35})
     public void theCommentBarFadesOnAnOpenedVideoInsteadOfStayingSolid() {
         resolveCommentBarIds();
         Settings.HIDE_DETAIL_COMMENT_BAR.save(false);
@@ -3581,8 +3589,9 @@ public class VideoOverlayHiderTest {
                     .rememberClearDisplayEvent(new ClearEvent(false, 2));
             Settings.FADE_CONTROLS_OPACITY.save(0);
             VideoOverlayHider.applyTo(detail);
-            assertEquals(View.GONE, bar.getVisibility());
-            assertEquals(View.GONE, strip.getVisibility());
+            assertEquals(View.VISIBLE, bar.getVisibility());
+            assertEquals(View.VISIBLE, strip.getVisibility());
+            assertEquals(0f, bar.getAlpha(), 0f);
             assertFalse(TapThroughControls.isMarked(bar));
 
             Settings.FADE_CONTROLS_OPACITY.save(100);

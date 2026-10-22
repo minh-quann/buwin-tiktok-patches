@@ -602,7 +602,7 @@ public final class VideoOverlayHider {
             // Asked of the chosen level: the burn-in dim lowers what's drawn, never what Clear
             // display does. With Keep faded controls in Clear display off, Clear display clears
             // them as it does at 100 and the fade is left to the rest of the time.
-            fadedClear = clearLive && chosenFade > 0 && chosenFade < 100 && Settings.FADE_IN_CLEAR_DISPLAY.get();
+            fadedClear = clearLive && chosenFade < 100 && Settings.FADE_IN_CLEAR_DISPLAY.get();
             fadeLevel = BurnInGuard.pass(activity, chosenFade, overlaysOn);
             boolean carryHides = carry && !fadedClear;
             topBarHeld = carryHides && !RememberClearDisplayPatch.isClearDisplayNow();
@@ -616,10 +616,9 @@ public final class VideoOverlayHider {
             // is left alone wherever the bar isn't found (see the pairing after the walk). Asked
             // only in the detail pager, the switch left that photo's bar up.
             // The faded Clear display keeps the bar in sight at the chosen level like the rest of
-            // the controls, and the fade fades it outside Clear display too; only a fade of 0 takes
-            // it away, with its strip, the way the switch does.
+            // the controls. Opacity, including 0%, never removes the bar or its pager strip.
             boolean detailCommentBar = Settings.HIDE_DETAIL_COMMENT_BAR.get()
-                    || (clearLive && !fadedClear) || chosenFade == 0;
+                    || (clearLive && !fadedClear);
             // The faded Clear display keeps the anchor row and the search bar in sight but out of
             // reach, which is what hiding them was for.
             boolean anchor = clearLive && !fadedClear;
@@ -1950,8 +1949,8 @@ public final class VideoOverlayHider {
                         // the cell's band keeps its place.
                         setHidden(view, wanted, View.INVISIBLE);
                     } else if (target == DETAIL_COMMENT_BAR_TARGET || target == DETAIL_MESSAGE_BAR_TARGET) {
-                        // Hidden with its strip by the switch, Clear display and a fade of 0;
-                        // otherwise faded, and out of a finger's way in the faded Clear display.
+                        // Only an explicit hide/clear removes the native footer and strip.
+                        // Fully transparent controls keep exactly the same layout as 1%.
                         setFaded(view, wanted ? 100 : fadeLevel, fadedClear && !wanted);
                         TapThroughControls.mark(view, !wanted && fadedClear);
                         setHidden(view, wanted);
@@ -1967,19 +1966,18 @@ public final class VideoOverlayHider {
                         // 47.1.4 keeps the caption frame, the music disc and the search bar
                         // beside the column, so they fade here. Invisible rather than gone, so
                         // the caption doesn't move.
-                        boolean gone = wanted || fadeLevel == 0;
+                        boolean gone = wanted;
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone, View.INVISIBLE);
                     } else if (target == ACTION_BAR_TARGET) {
-                        // The rail's column. Fully faded it goes the way Clear display takes it,
-                        // so nothing invisible takes a tap.
-                        boolean gone = wanted || fadeLevel == 0;
+                        // Opacity must not reflow the rail, captions, or native video geometry.
+                        boolean gone = wanted;
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone);
                     } else if (target >= RAIL_TARGET_START && target < STATUS_BAR_SPACER_TARGET) {
-                        boolean gone = wanted || fadeLevel == 0;
+                        boolean gone = wanted;
                         setFaded(view, gone ? 100 : fadeLevel, fadedClear);
                         TapThroughControls.mark(view, !gone && fadedClear);
                         setHidden(view, gone);
@@ -2004,23 +2002,13 @@ public final class VideoOverlayHider {
                         }
                         // The Following stories pill is the strip's neighbour at the top of the
                         // feed, so it fades with the tabs; it was only ever hidden (#84).
-                        if (target == BOTTOM_TABS_TARGET) {
-                            if (fadeLevel == 0) {
-                                fadeTabIcons(view, 0);
-                                setHidden(view, true, View.INVISIBLE);
-                            } else {
-                                fadeTabIcons(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
-                                setHidden(view, wanted, View.INVISIBLE);
-                            }
-                        } else {
-                            if (fadeLevel == 0) {
-                                setFaded(view, 0);
-                                setHidden(view, true, View.INVISIBLE);
-                            } else {
-                                setFaded(view, wanted ? 100 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel));
-                                setHidden(view, wanted, View.INVISIBLE);
-                            }
-                        }
+                        int navigationFade = wanted ? 100
+                                : fadeLevel == 0 ? 0 : Math.max(NAVIGATION_FADE_FLOOR, fadeLevel);
+                        if (target == BOTTOM_TABS_TARGET) fadeTabIcons(view, navigationFade);
+                        else setFaded(view, navigationFade);
+                        // isShown() drives feed detection, the chin and native crop. Keep the
+                        // original component visible while its foreground pixels have alpha 0.
+                        setHidden(view, wanted, View.INVISIBLE);
                     } else if (target == BOTTOM_SPACER_TARGET) {
                         setHidden(view, wanted);
                     } else if (target == CLEAR_EXIT_TARGET || target == CLEAR_PLAYBACK_TARGET
@@ -2071,12 +2059,11 @@ public final class VideoOverlayHider {
      */
     private static void fadeFullscreenEntries() {
         if (FULLSCREEN_ENTRIES.isEmpty()) return;
-        boolean gone = fadeLevel == 0;
         for (View entry : new ArrayList<>(FULLSCREEN_ENTRIES.keySet())) {
             if (entry == null || !entry.isAttachedToWindow()) continue;
-            setFaded(entry, gone ? 100 : fadeLevel, fadedClear);
-            TapThroughControls.mark(entry, !gone && fadedClear);
-            setHidden(entry, gone, View.INVISIBLE);
+            setFaded(entry, fadeLevel, fadedClear);
+            TapThroughControls.mark(entry, fadedClear);
+            setHidden(entry, false, View.INVISIBLE);
         }
     }
 
