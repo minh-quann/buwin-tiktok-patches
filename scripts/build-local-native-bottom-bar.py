@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild the changed native bottom-bar patch and Java extension in a local Morphe cache.
+"""Rebuild a native bottom-bar or subtitle patch and Java extension in a local Morphe cache.
 
 Uses the installed Desktop patcher API as a classpath when the Gradle registry is unavailable.
 Preserves all unrelated JVM classes/resources and regenerates the Android patch DEX as well.
@@ -36,6 +36,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cache', type=Path, required=True)
     parser.add_argument('--prepare-only', action='store_true', help='Build/verify without replacing the cache')
+    parser.add_argument('--subtitle-tools', action='store_true',
+                        help='Rebuild Subtitle tools instead of the bottom-bar Kotlin sources')
     parser.add_argument('--desktop-jar', type=Path,
                         default=Path.home() / '.local/share/morphe-desktop/morphe-desktop.jar')
     parser.add_argument('--output', type=Path, default=ROOT / 'extensions/tiktok/build/native-bottom-bar')
@@ -56,15 +58,18 @@ def main():
         classes = work / 'classes'
         classes.mkdir()
         package = ROOT / 'patches/src/main/kotlin/app/morphe/patches/tiktok/interaction/videooverlays'
+        sources = ([package.parent / 'captions/SubtitleToolsPatch.kt'] if args.subtitle_tools else
+                   [package / 'NativeBottomBarHooks.kt', package / 'HideVideoOverlaysPatch.kt'])
         run(['java', '-cp', os.pathsep.join(map(str, [compiler, args.desktop_jar, annotations])),
              'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect',
              '-jvm-target', '17', '-module-name', 'morphe_patches',
              '-Xfriend-paths=' + str(baseline), '-classpath',
              os.pathsep.join(map(str, [baseline, args.desktop_jar])), '-d', classes,
-             package / 'NativeBottomBarHooks.kt', package / 'HideVideoOverlaysPatch.kt'])
+             *sources])
         replacements = {p.relative_to(classes).as_posix(): p.read_bytes()
                         for p in classes.rglob('*.class')}
-        if not any(name.endswith('/NativeBottomBarHooksKt.class') for name in replacements):
+        expected = '/SubtitleToolsPatchKt.class' if args.subtitle_tools else '/NativeBottomBarHooksKt.class'
+        if not any(name.endswith(expected) for name in replacements):
             raise RuntimeError('Native hook did not compile')
         with ZipFile(baseline) as original:
             names = original.namelist()
@@ -87,7 +92,7 @@ def main():
                 raise RuntimeError('Expected one patch DEX')
             replacements['classes.dex'] = dexes[0].read_bytes()
             replacements['extensions/tiktok.mpe'] = (extension_output / 'classes.dex').read_bytes()
-            prepared = output / 'native-bottom-bar.mpp'
+            prepared = output / ('subtitle-tools.mpp' if args.subtitle_tools else 'native-bottom-bar.mpp')
             with ZipFile(prepared, 'w') as bundle:
                 bundle.comment = original.comment
                 for entry in original.infolist():

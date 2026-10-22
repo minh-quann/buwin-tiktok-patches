@@ -91,6 +91,34 @@ val subtitleToolsPatch = bytecodePatch(
             "Subtitle tools: the caption render calls setTextLayout(Layout) ${layoutCalls.size} " +
                 "times, not once.",
         )
+        // The expanded caption uses this shared Layout-drawing view, not the TextView used
+        // for its collapsed label. Fix its measurement where the native view commits it;
+        // a render-time resize misses remeasures and can still clip a later wrapped cue.
+        val layoutView = mutableClassDefBy(layoutCall.value.getReference<MethodReference>()!!.definingClass)
+        check(layoutView.methods.any {
+            it.name == "getTextLayout" && it.parameterTypes.isEmpty() && it.returnType == "Landroid/text/Layout;"
+        }) { "Subtitle tools: the caption layout view no longer exposes its drawn Layout." }
+        val measure = layoutView.methods.singleOrNull {
+            it.name == "onMeasure" && it.parameterTypes == listOf("I", "I") && it.returnType == "V"
+        } ?: throw PatchException("Subtitle tools: the caption layout view has no onMeasure(II)V.")
+        val dimensionCalls = measure.implementation!!.instructions.withIndex().filter { (_, instruction) ->
+            instruction.getReference<MethodReference>()?.let {
+                it.name == "setMeasuredDimension" && it.parameterTypes == listOf("I", "I")
+            } == true
+        }
+        check(dimensionCalls.size == 1) {
+            "Subtitle tools: expected one caption setMeasuredDimension call, found ${dimensionCalls.size}."
+        }
+        val dimensionCall = dimensionCalls.single()
+        val heightRegister = when (val call = dimensionCall.value) {
+            is FiveRegisterInstruction -> call.registerE
+            is RegisterRangeInstruction -> call.startRegister + 2
+            else -> throw PatchException("Subtitle tools: the caption measurement has no height register.")
+        }
+        measure.addInstructionsAtControlFlowLabel(dimensionCall.index, """
+            invoke-static { p0, v$heightRegister }, ${EXTENSION}CaptionStyle;->measuredHeight(Landroid/view/View;I)I
+            move-result v$heightRegister
+        """)
         val layoutRegister = when (val call = layoutCall.value) {
             is FiveRegisterInstruction -> call.registerD
             is RegisterRangeInstruction -> call.startRegister + 1

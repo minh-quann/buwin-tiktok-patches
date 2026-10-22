@@ -18,6 +18,7 @@ import android.widget.TextView;
 import app.morphe.extension.shared.ResourceIdCache;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.diagnostics.HookStatus;
+import app.morphe.extension.tiktok.blockauthor.Reflect;
 import app.morphe.extension.tiktok.settings.Settings;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -49,6 +50,7 @@ public final class CaptionStyle {
      */
     private static final String[] TEXT_IDS = {"47.4.3:dm5"};
     private static final String[] BACKGROUND_IDS = {"47.4.3:dly"};
+    private static final String[] CANVAS_IDS = {"47.4.3:dm6"};
     private static final String TEXT = String.join("|", TEXT_IDS);
     private static final String BACKGROUND = String.join("|", BACKGROUND_IDS);
     private static final ResourceIdCache RESOURCE_IDS = new ResourceIdCache();
@@ -130,6 +132,32 @@ public final class CaptionStyle {
     private static Layout build(Layout original, TextPaint paint, int width) {
         return new StaticLayout(original.getText(), paint, width,
                 original.getAlignment(), original.getSpacingMultiplier(), original.getSpacingAdd(), true);
+    }
+
+    /**
+     * The expanded cue is drawn by TuxTextLayoutView, not the neighbouring TextView. Its
+     * onMeasure uses getHeight(true) and a separate maximum before setMeasuredDimension;
+     * either can be shorter than the Layout it actually draws, cutting through the last
+     * line. Measure this caption from that same Layout, including the view's own padding.
+     * The native WRAP_CONTENT strip then follows its child without a fixed height, overlay
+     * or changes to the video/widget anchors. Other users of this shared Tux view keep their
+     * original measurement. Run on every measure, including a remeasure without a new cue.
+     */
+    public static int measuredHeight(View canvas, int measured) {
+        if (canvas == null) return measured;
+        boolean caption = false;
+        for (String name : CANVAS_IDS) {
+            int id = RESOURCE_IDS.resolve(canvas.getResources(),
+                    canvas.getContext().getPackageName(), name, false);
+            if (id != 0 && canvas.getId() == id) { caption = true; break; }
+        }
+        if (!caption) return measured;
+        Object value = Reflect.invoke(canvas, "getTextLayout");
+        if (!(value instanceof Layout)) return measured;
+        Layout layout = (Layout) value;
+        if (layout.getText() == null || layout.getText().length() == 0) return measured;
+        long full = (long) layout.getHeight() + canvas.getPaddingTop() + canvas.getPaddingBottom();
+        return (int) Math.max(measured, Math.min(Integer.MAX_VALUE, full));
     }
 
     /** The widest line's drawn width, trailing spaces left out. */
