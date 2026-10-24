@@ -21,11 +21,14 @@ ContinuousCapsule, 56dp bar, 48dp pill and 21dp lens. The adapter sets both blur
 The adapter supplies white ink on feed/dark pages and black ink on light native pages;
 MEBIECO's orange default is not used. Foreground fade/pixel shift applies to the Compose
 tab columns, while native copies stay transparent through host rebinds and fade resets.
-The native host matches MEBIECO's 88dp frame: 8dp top, 24dp bottom, 16dp side margins,
-20dp icons and 12sp labels. The gesture chin is included in that bottom gap.
+The capsule, side margins, icons and labels keep MEBIECO's sizes. At the user's request,
+the adapter reduces only the bottom gap from 24dp to 8dp: its native frame is now 72dp
+(8dp top + 56dp capsule + 8dp bottom), lowering the capsule and native caption/seek reserve
+by 16dp together. Side margins remain 16dp, icons 20dp and labels 12sp.
 Other icon slots use MEBIECO's 20dp size. The native multicolor create button has its
 own 48x34dp slot, as requested, with transparent artwork margins trimmed once.
-The capsule, pill, press scales, labels and insets match the MEBIECO component.
+The capsule, pill, press scales and labels match the MEBIECO component; only the
+adapter's bottom gap has been reduced as described above.
 
 The component is an attached child of TikTok's original bottom-tabs component.
 Native controls retain their bounds, click/touch listeners and navigation actions;
@@ -51,7 +54,7 @@ The original Kyant layerBackdrop/effects reuse that GPU display list, rather tha
 and drawing the native page a second time. No screenshot or TextureView.getBitmap is used.
 A region-culled recorder remains a fallback for views without the main native scene hook.
 Native light/dark background colors are inspected only on layout/tab changes.
-The Compose child owns the full 88dp frame; native child/padding clipping is disabled only
+The Compose child owns the full 72dp frame; native child/padding clipping is disabled only
 on the tabs component so the pill's press growth and shadows have room.
 
 Scrolling wakes Backdrop on the native animation frame. Dirty native content can wake it;
@@ -73,9 +76,13 @@ native tabs frame with the floating capsule; no ambient background is drawn outs
 Actual picture pixels are clipped out. Palette sampling occurs once from the already
 softened native cover; there is no recurring video screenshot for gradient colors.
 Native cover blur uses separable sliding windows rather than 49 neighbors per output pixel.
-The native main-pager strip is collapsed during measure so the video/background reaches
-behind the floating bar. Caption/rail/seek reserve the measured host frame. Smart crop
-still limits source loss to 16%; native cover fill is rechecked when the viewport changes.
+The native main-pager strip is collapsed during measure so native page content/background
+can continue behind the floating bar. Caption/rail/seek reserve the native host frame.
+The feed picture's fill viewport ends at that same seek/bar boundary, calculated from
+stable parent dimensions and measured bar height. Counting the entire parent including
+the glass frame made 16:9 exceed the 16% cap on the 1320x2868 Honor, producing a 260px
+top gap until a gesture changed layout. Hidden tabs during pinch retain the held boundary.
+Smart crop still limits source loss to 16%; native cover fill is rechecked when the viewport changes.
 Playback behavior and final visual fidelity still require an installed device check.
 
 Non-Home tabs also collapse the native page footer slots wr4/ch4 during measure. These

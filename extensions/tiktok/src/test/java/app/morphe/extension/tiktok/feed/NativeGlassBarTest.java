@@ -64,10 +64,10 @@ public class NativeGlassBarTest {
             float d = activity.getResources().getDisplayMetrics().density;
             for (int i = 0; i < 4; i++) {
                 int adjusted = NativeBottomBar.heightSpec(bar, spec);
-                assertEquals(Math.round(88 * d), View.MeasureSpec.getSize(adjusted));
+                assertEquals(Math.round(72 * d), View.MeasureSpec.getSize(adjusted));
                 assertEquals(2 + Math.round(16 * d), bar.getPaddingLeft());
                 assertEquals(3 + Math.round(8 * d), bar.getPaddingTop());
-                assertEquals(5 + Math.round(24 * d), bar.getPaddingBottom());
+                assertEquals(5 + Math.round(8 * d), bar.getPaddingBottom());
                 assertEquals(Color.TRANSPARENT, ((android.graphics.drawable.ColorDrawable)bar.getBackground()).getColor());
             }
             assertTrue(icon.performClick()); assertEquals(1, clicks[0]);
@@ -99,12 +99,62 @@ public class NativeGlassBarTest {
             ((ResourceIdCache)idsField.get(null)).putForTests(activity.getPackageName(), "47.4.3:onp", bar.getId());
             host.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
             host.layout(0, 0, 1320, 2868);
-            assertEquals(2868, NativeGlassBar.viewportHeight(video, 0));
+            assertEquals(2638, NativeGlassBar.viewportHeight(video, 0));
             cell.setTranslationY(2868);
-            assertEquals(2868, NativeGlassBar.viewportHeight(video, 0));
+            assertEquals(2638, NativeGlassBar.viewportHeight(video, 0));
+            assertTrue("Ordinary 16:9 must fill the status bar before any pinch gesture",
+                    app.morphe.extension.tiktok.interaction.StatusBarVideoFill.cropAllowed(1080, 1920,
+                            1320, NativeGlassBar.viewportHeight(video, 0)));
             assertFalse(app.morphe.extension.tiktok.interaction.StatusBarVideoFill.cropAllowed(1080, 1920, 1320, 2868));
             bar.setVisibility(View.GONE);
             assertEquals(0, NativeGlassBar.viewportHeight(video, 0));
+        }
+    }
+
+    @Test @Config(qualifiers = "xxxhdpi")
+    public void glassFillsBeforePinchAndSharesTheLoweredSeekBoundary() throws Exception {
+        Assume.assumeTrue(Build.VERSION.SDK_INT >= 33);
+        Settings.BOTTOM_BAR_STYLE.save("glass"); NativeGlassBar.resetForTests();
+        Settings.STATUS_BAR_STYLE.save(Settings.STATUS_BAR_STYLE_SCALE);
+        Settings.FIT_VIDEO_TO_SCREEN.save(false);
+        try (var controller = Robolectric.buildActivity(com.ss.android.ugc.aweme.main.MainActivity.class).setup()) {
+            Activity activity = controller.get();
+            FrameLayout mask = new FrameLayout(activity), cell = new FrameLayout(activity);
+            View video = new View(activity), bar = new View(activity), seek = new View(activity);
+            bar.setId(0x7f0a4bca); seek.setId(0x7f0a1101);
+            cell.addView(video, new FrameLayout.LayoutParams(1320, 2347));
+            mask.addView(cell, new FrameLayout.LayoutParams(-1, -1));
+            mask.addView(seek, new FrameLayout.LayoutParams(-1, 90, Gravity.BOTTOM));
+            mask.addView(bar, new FrameLayout.LayoutParams(-1, NativeGlassBar.reserve(bar), Gravity.BOTTOM));
+            activity.setContentView(mask);
+            var field = NativeBottomBar.class.getDeclaredField("IDS"); field.setAccessible(true);
+            var ids = (ResourceIdCache) field.get(null);
+            ids.putForTests(activity.getPackageName(), "47.4.3:onp", bar.getId());
+            ids.putForTests(activity.getPackageName(), "video_seek_bar", seek.getId());
+            mask.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
+            mask.layout(0, 0, 1320, 2868);
+            NativeBottomBar.measureFeed(mask);
+            mask.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));
+            mask.layout(0, 0, 1320, 2868);
+            assertEquals("Seek must touch the picture side of the same native boundary", bar.getTop()-1, seek.getTop()+seek.getHeight()/2);
+            var original = new app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result(1320,2347);
+            var before = (app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result)
+                    app.morphe.extension.tiktok.interaction.VideoFit.fitted(video, original);
+            assertTrue("Fill must work before the first gesture", before.getTranslateY() <= 0);
+            assertTrue(before.getHeight() >= bar.getTop());
+            var owner = new HoldVideoViewportTest.Edge(video);
+            HoldVideoViewport.pinch(owner, true);
+            bar.setVisibility(View.GONE);
+            var hidden = (app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result)
+                    app.morphe.extension.tiktok.interaction.VideoFit.fitted(video, original);
+            assertEquals(before.getHeight(), hidden.getHeight());
+            assertEquals(before.getTranslateY(), hidden.getTranslateY());
+            bar.setVisibility(View.VISIBLE);
+            HoldVideoViewport.pinch(owner, false);
+            var released = (app.morphe.extension.tiktok.interaction.StatusBarVideoFillTest.Result)
+                    app.morphe.extension.tiktok.interaction.VideoFit.fitted(video, original);
+            assertEquals(before.getHeight(), released.getHeight());
+            assertEquals(before.getTranslateY(), released.getTranslateY());
         }
     }
 
@@ -545,7 +595,7 @@ public class NativeGlassBarTest {
                 tab.setSelected(i == 0);
                 bar.addView(tab,new LinearLayout.LayoutParams(80,56));
             }
-            mask.addView(bar,new FrameLayout.LayoutParams(-1,88,Gravity.BOTTOM));
+            mask.addView(bar,new FrameLayout.LayoutParams(-1,NativeGlassBar.reserve(bar),Gravity.BOTTOM));
             View seek = new View(activity); seek.setOnTouchListener((v,event) -> { seeks[0]++; return true; });
             mask.addView(seek,new FrameLayout.LayoutParams(-1,180,Gravity.BOTTOM));
             activity.setContentView(mask);
@@ -562,7 +612,7 @@ public class NativeGlassBarTest {
             float capsuleY = bar.getTop()+36*density;
             float seekY = bar.getTop()-10*density;
             float beyondX = bar.getLeft()+bar.getWidth()+50;
-            // Both views cover y=448. The capsule must win BEFORE native seek dispatch.
+            // The lowered capsule overlaps native seek. Claim it before native dispatch.
             MotionEvent event = MotionEvent.obtain(down,down,MotionEvent.ACTION_DOWN,homeX,capsuleY,0);
             assertTrue(mask.dispatchTouchEvent(event)); event.recycle();
             looper.idleFor(java.time.Duration.ofMillis(160));

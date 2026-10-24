@@ -48,9 +48,9 @@ public final class NativeGlassBar {
     }
 
     static int heightSpec(View bar, int spec, int chin) {
-        // MEBIECO: 8dp top + 56dp capsule + 24dp bottom. Its bottom gap already
-        // contains the gesture chin; adding the system reserve again raises the bar.
-        int height = Math.round(88 * bar.getResources().getDisplayMetrics().density);
+        // Keep MEBIECO's 56dp capsule; reduce only the bottom gap from 24dp to 8dp.
+        // The native frame, captions and seek boundary all move down by the same 16dp.
+        int height = Math.round(72 * bar.getResources().getDisplayMetrics().density);
         return View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.getMode(spec));
     }
 
@@ -71,11 +71,11 @@ public final class NativeGlassBar {
     }
 
     static int bottomGap(View bar) {
-        return isGlass() ? Math.round(24 * bar.getResources().getDisplayMetrics().density) : 0;
+        return isGlass() ? Math.round(8 * bar.getResources().getDisplayMetrics().density) : 0;
     }
 
     static int reserve(View bar) {
-        return Math.round(88 * bar.getResources().getDisplayMetrics().density);
+        return Math.round(72 * bar.getResources().getDisplayMetrics().density);
     }
 
     static void prepare(View bar) {
@@ -227,16 +227,27 @@ public final class NativeGlassBar {
         params.bottomMargin = previous; list.setLayoutParams(params); return true;
     }
 
-    /** Only a main-feed bar in this view's own ancestry may expand its stable viewport. */
+    /** Only a main-feed bar in this view's own ancestry defines its stable picture boundary. */
     public static int viewportHeight(View video, int fallback) {
         if (!isGlass()) return fallback;
         View bar = NativeBottomBar.tabs(video);
-        if (bar == null || !(bar.getParent() instanceof View) || !bar.isShown()) return fallback;
+        if (bar == null || !(bar.getParent() instanceof View)
+                || (!bar.isShown() && !HoldVideoViewport.isHolding(video))) return fallback;
         View host = (View) bar.getParent();
         for (android.view.ViewParent p = video.getParent(); p instanceof View; p = p.getParent()) {
             if (p == host) {
                 int height = host.getMeasuredHeight();
-                return height > 0 ? Math.max(fallback, height) : fallback;
+                if (height <= 0) return fallback;
+                // The transparent/floating chrome is not extra picture height. Counting
+                // it made ordinary 16:9 exceed the 16% crop cap (1320x2868), letterbox
+                // at y=260, then change crop when pinch hid the bar. Match the native
+                // seek boundary from stable parent dimensions, never a scrolling cell.
+                int frame = bar.getMeasuredHeight() > 0 ? bar.getMeasuredHeight() : reserve(bar);
+                int bottom = host.getPaddingBottom();
+                if (bar.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)
+                    bottom += ((ViewGroup.MarginLayoutParams) bar.getLayoutParams()).bottomMargin;
+                int picture = height - frame - bottom;
+                return picture > 0 ? picture : fallback;
             }
         }
         return fallback;

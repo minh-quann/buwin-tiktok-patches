@@ -291,7 +291,7 @@ internal object NativeLiquidTabs {
                     isDark = darkPage,
                     activeTabColor = if (darkPage) "#FFFFFF" else "#000000",
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp)
+                        .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp)
                 ) {
                     tabs.forEachIndexed { index, tab ->
                         LiquidBottomTab(
@@ -327,7 +327,7 @@ internal object NativeLiquidTabs {
             val bar = barRef.get() ?: return
             val width = bar.width.coerceAtLeast(1)
             val height = bar.height.coerceAtLeast(1)
-            // The original pill can grow beyond 56dp. Its Compose host owns the full 88dp
+            // The original pill can grow beyond 56dp. Its Compose host owns the full 72dp
             // frame, including the source's shadow/press space, not just the capsule bounds.
             if (compose.measuredWidth != width || compose.measuredHeight != height) {
                 compose.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
