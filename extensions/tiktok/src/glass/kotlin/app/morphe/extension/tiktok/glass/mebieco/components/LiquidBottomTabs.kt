@@ -76,6 +76,7 @@ fun LiquidBottomTabs(
     liquidGlassEnabled: Boolean = true,
     activeTabColor: String? = null,
     blurRadiusDp: Float = 4f,
+    tintActiveContent: Boolean = true,
     modifier: Modifier = Modifier,
     activeContent: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit
@@ -355,7 +356,7 @@ fun LiquidBottomTabs(
                     .height(48f.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 4f.dp)
-                    .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
+                    .graphicsLayer(colorFilter = if (tintActiveContent) ColorFilter.tint(accentColor) else null),
                 verticalAlignment = Alignment.CenterVertically,
                 content = activeContent ?: content
             )

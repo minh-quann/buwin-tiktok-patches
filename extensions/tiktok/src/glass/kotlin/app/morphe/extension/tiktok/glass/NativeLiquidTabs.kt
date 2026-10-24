@@ -288,6 +288,9 @@ internal object NativeLiquidTabs {
                     backdrop = backdrop,
                     tabsCount = tabs.size,
                     blurRadiusDp = 2f,
+                    // Icons/text are colored individually below. A whole-row tint erases
+                    // the black plus and cyan/red edges from TikTok's multicolor bitmap.
+                    tintActiveContent = false,
                     isDark = darkPage,
                     activeTabColor = if (darkPage) "#FFFFFF" else "#000000",
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()

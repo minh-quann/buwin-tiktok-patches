@@ -15,12 +15,16 @@ The active component is the user's customized MEBIECO version copied from
 `/home/quan/MEBIECO/mobile/node_modules/expo-liquid-glass-native/android/src/main/java/expo/modules/liquidglassnative/`
 into `extensions/tiktok/src/glass/kotlin/app/morphe/extension/tiktok/glass/mebieco/`.
 Its five component/utility files retain their original effects/gestures, with an approved
-blur-strength parameter plus package/import relocation and attribution; `mebieco.sha256.json` records the source hashes before relocation.
+blur-strength and active-content tint parameters plus package/import relocation and attribution; `mebieco.sha256.json` records the source hashes before relocation.
 NativeLiquidTabs.kt uses this component, including its touch overlay, lens punch-out,
 ContinuousCapsule, 56dp bar, 48dp pill and 21dp lens. The adapter sets both blur passes to 2dp.
 The adapter supplies white ink on feed/dark pages and black ink on light native pages;
 MEBIECO's orange default is not used. Foreground fade/pixel shift applies to the Compose
 tab columns, while native copies stay transparent through host rebinds and fade resets.
+The adapter colors monochrome icons/text individually and disables the optional whole-row
+active tint. Otherwise the white tint also replaces the black plus and cyan/red edges of
+TikTok's multicolor create bitmap as the lens crosses it. The original tint remains the
+component's default; effects and gestures are unchanged.
 The capsule, side margins, icons and labels keep MEBIECO's sizes. At the user's request,
 the adapter reduces only the bottom gap from 24dp to 8dp: its native frame is now 72dp
 (8dp top + 56dp capsule + 8dp bottom), lowering the capsule and native caption/seek reserve
