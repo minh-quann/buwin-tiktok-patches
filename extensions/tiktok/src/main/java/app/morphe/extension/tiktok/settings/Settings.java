@@ -853,6 +853,8 @@ public class Settings extends BaseSettings {
      * each video and swaps the bar's background for a clear one, and puts both back when this goes
      * off or Buwin is paused.
      */
+    /** Native bottom component is rebuilt only on process restart. */
+    public static final StringSetting BOTTOM_BAR_STYLE = new StringSetting("bottom_bar_style", "black", true);
     public static final BooleanSetting SEE_THROUGH_BOTTOM_BAR = new BooleanSetting("see_through_bottom_bar", FALSE);
     /**
      * With See-through bottom bar, draws the tabs on a rounded see-through pill inset from the
@@ -1314,6 +1316,8 @@ public class Settings extends BaseSettings {
             DOWNLOAD_STICKER_PATH.save(legacyPath);
             DOWNLOAD_PATHS_MIGRATED.save(TRUE);
         }
+        // Freeze before a settings screen or backup import can change the saved choice.
+        app.morphe.extension.tiktok.feed.NativeGlassBar.style();
     }
 
     /**

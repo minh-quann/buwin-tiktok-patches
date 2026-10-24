@@ -70,14 +70,22 @@ internal object CommentMenuListFingerprint : Fingerprint(
 /**
  * The coroutine that builds the comment menu's rows. Its log names the panel's
  * `loadLongPressItems`, and the Report row it builds carries the icon the block row matches.
- * One string, not two: the log is a single literal ("CommentLongPressFragment@922.loadLongPressItems$2"
- * on 47.1.4), and the patcher lets one string load answer one wanted string only.
+ * Keep the stable Report key in strings: patcher 2.0 matches those literally when a newer
+ * bundle is enabled alongside ours. The generated log suffix varies by build, so inspect
+ * that load explicitly instead of relying on the legacy substring matching mode.
  */
 internal object CommentMenuItemsFingerprint : Fingerprint(
     name = "invokeSuspend",
     returnType = "Ljava/lang/Object;",
-    strings = listOf(".loadLongPressItems"),
-    custom = { method, _ -> method.reportRowIcon() != null },
+    strings = listOf("report"),
+    custom = { method, _ ->
+        method.implementation?.instructions?.any {
+            (it.opcode == Opcode.CONST_STRING || it.opcode == Opcode.CONST_STRING_JUMBO) &&
+                it.getReference<StringReference>()?.string?.let { log ->
+                    log.startsWith("CommentLongPressFragment@") && log.contains(".loadLongPressItems")
+                } == true
+        } == true && method.reportRowIcon() != null
+    },
 )
 
 /** A share action's `key()` that answers [key] and nothing else. */

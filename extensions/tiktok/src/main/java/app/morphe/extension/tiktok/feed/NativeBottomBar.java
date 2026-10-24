@@ -28,16 +28,18 @@ public final class NativeBottomBar {
     private static final Map<View, int[]> SEARCH_MARGINS = new WeakHashMap<>();
     private static final Map<View, int[]> SEEK_MARGINS = new WeakHashMap<>();
     private static final Map<View, Drawable> CLEAR_BACKGROUNDS = new WeakHashMap<>();
+    private static final Map<View, Integer> GLASS_STRIPS = new WeakHashMap<>();
     private NativeBottomBar() {}
 
     private static boolean enabled() {
-        return SettingsStatus.videoOverlaysEnabled && !BuwinPause.isPaused();
+        return SettingsStatus.videoOverlaysEnabled && !BuwinPause.isPaused() && !NativeGlassBar.original();
     }
 
     /** The incoming spec is TikTok's native row height, never our previous measured height. */
     public static int heightSpec(View bar, int spec) {
         Integer padding = BASE_PADDING.get(bar);
         if (!enabled()) {
+            NativeGlassBar.prepare(bar);
             if (padding != null) {
                 if (bar.getPaddingBottom() != padding) bar.setPadding(bar.getPaddingLeft(),
                         bar.getPaddingTop(), bar.getPaddingRight(), padding);
@@ -51,13 +53,15 @@ public final class NativeBottomBar {
         }
         int chin = SeeThroughBottomBar.isSystemIndicatorActive(bar)
                 ? 0 : SeeThroughBottomBar.getChinHeight(bar.getContext());
-        int bottom = padding + chin;
+        NativeGlassBar.prepare(bar);
+        int bottom = padding + (NativeGlassBar.isGlass() ? NativeGlassBar.bottomGap(bar) : chin);
         if (bar.getPaddingBottom() != bottom) bar.setPadding(bar.getPaddingLeft(),
                 bar.getPaddingTop(), bar.getPaddingRight(), bottom);
         blackBackground(bar);
         removeDivider(bar);
         SeeThroughBottomBar.adjustBottomBarChin(bar);
         int mode = View.MeasureSpec.getMode(spec);
+        if (NativeGlassBar.isGlass()) return NativeGlassBar.heightSpec(bar, spec, chin);
         // UNSPECIFIED already measures padding in LinearLayout; EXACTLY/AT_MOST need extra room.
         return mode == View.MeasureSpec.UNSPECIFIED ? spec
                 : View.MeasureSpec.makeMeasureSpec(View.MeasureSpec.getSize(spec) + chin, mode);
@@ -66,6 +70,11 @@ public final class NativeBottomBar {
     /** Native component background and reserved space are painted as one continuous rectangle. */
     public static void drawBackground(View bar, Canvas canvas) {
         if (!enabled()) return;
+        if (NativeGlassBar.isGlass()) {
+            NativeGlassBar.draw(bar, canvas, SeeThroughBottomBar.isSystemIndicatorActive(bar)
+                    ? 0 : SeeThroughBottomBar.getChinHeight(bar.getContext()));
+            return;
+        }
         blackBackground(bar);
         int save = canvas.save();
         canvas.clipRect(0, 0, bar.getWidth(), bar.getHeight());
@@ -74,6 +83,7 @@ public final class NativeBottomBar {
     }
 
     private static void blackBackground(View bar) {
+        if (NativeGlassBar.isGlass()) { NativeGlassBar.prepare(bar); return; }
         Drawable background = bar.getBackground();
         if (!(background instanceof ColorDrawable)
                 || ((ColorDrawable) background).getColor() != Color.BLACK) bar.setBackgroundColor(Color.BLACK);
@@ -81,6 +91,12 @@ public final class NativeBottomBar {
 
     /** Registered by the native component itself, so host rebinds cannot flash the separator. */
     public static boolean prepareFrame(View bar) {
+        // TikTok keeps a second instance (ona) attached and GONE beside the main onp tabs.
+        // Both receive pre-draw even while hidden. Only onp owns the feed's shared margins:
+        // letting ona restore them to zero makes onp lift them again on every traversal,
+        // so both listeners veto drawing forever (including the player's first frame).
+        View primary = tabs(bar);
+        if (primary != null && primary != bar) return true;
         boolean active = enabled() && (bar.isShown() || HoldVideoViewport.isHolding(bar));
         boolean changed = false;
         // Sibling cells can reuse their measure cache when only the tab bar changes. Restore
@@ -89,24 +105,32 @@ public final class NativeBottomBar {
             if (widgets.getRootView() == bar.getRootView()) changed |= moveMargins(widgets, active ? reserve(bar) : 0);
         }
         if (!active) {
-            if (bar.getParent() instanceof View) changed |= measureFeed((View) bar.getParent());
+            if (bar.getParent() instanceof View) {
+                changed |= measureGlassPager((View) bar.getParent());
+                changed |= measureFeed((View) bar.getParent());
+            }
             return !changed;
         }
         blackBackground(bar);
         changed |= removeDivider(bar);
-        if (bar.getParent() instanceof View) changed |= measureFeed((View) bar.getParent());
+        if (bar.getParent() instanceof View) {
+            changed |= measureGlassPager((View) bar.getParent());
+            changed |= measureFeed((View) bar.getParent());
+        }
         return !changed;
     }
 
-    private static View tabs(View view) {
+    public static View tabs(View view) {
         int id = IDS.resolve(view.getResources(), view.getContext().getPackageName(), "47.4.3:onp", false);
         return id == 0 ? null : view.getRootView().findViewById(id);
     }
 
     private static int reserve(View bar) {
-        return enabled() && bar != null && (bar.getVisibility() == View.VISIBLE || HoldVideoViewport.isHolding(bar))
-                && !SeeThroughBottomBar.isSystemIndicatorActive(bar)
-                ? SeeThroughBottomBar.getChinHeight(bar.getContext()) : 0;
+        if (!enabled() || bar == null
+                || (bar.getVisibility() != View.VISIBLE && !HoldVideoViewport.isHolding(bar))) return 0;
+        if (NativeGlassBar.isGlass()) return NativeGlassBar.reserve(bar);
+        return (SeeThroughBottomBar.isSystemIndicatorActive(bar) ? 0
+                : SeeThroughBottomBar.getChinHeight(bar.getContext()));
     }
 
     /** Runs in the original feed cell's onMeasure, including cells preloaded off screen. */
@@ -189,14 +213,16 @@ public final class NativeBottomBar {
 
     /** Runs before the native seek mask measures its children, not after a visible frame. */
     public static boolean measureFeed(View mask) {
+        boolean footerChanged = NativeGlassBar.clearPageFooters(mask);
+        measureGlassPager(mask);
         View clearBar = prepareClearBar(mask);
         NativeSafeArea.measureDetailPage(mask);
-        if (!(mask instanceof ViewGroup)) return false;
+        if (!(mask instanceof ViewGroup)) return footerChanged;
         View bar = tabs(mask);
-        if ((bar == null || bar.getParent() != mask) && clearBar == null) return false;
+        if ((bar == null || bar.getParent() != mask) && clearBar == null) return footerChanged;
         int id = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "video_seek_bar", false);
         View seek = id == 0 ? null : mask.findViewById(id);
-        if (seek == null || !(seek.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return false;
+        if (seek == null || !(seek.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return footerChanged;
         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) seek.getLayoutParams();
         int[] held = SEEK_MARGINS.get(seek);
         int base = held != null && params.bottomMargin == held[1] ? held[0] : params.bottomMargin;
@@ -208,7 +234,7 @@ public final class NativeBottomBar {
             ViewGroup.LayoutParams rowParams = clearBar.getLayoutParams();
             int rowHeight = rowParams != null && rowParams.height > 0
                     ? rowParams.height : clearBar.getMeasuredHeight();
-            if (rowHeight <= 0) return false;
+            if (rowHeight <= 0) return footerChanged;
             int rowBottom = rowParams instanceof ViewGroup.MarginLayoutParams
                     ? ((ViewGroup.MarginLayoutParams) rowParams).bottomMargin : 0;
             // Both bottom-anchored siblings already inherit the mask's bottom padding.
@@ -222,20 +248,46 @@ public final class NativeBottomBar {
         } else {
             if (!enabled() || bar == null || bar.getVisibility() != View.VISIBLE) {
                 SEEK_MARGINS.remove(seek);
-                if (held == null || params.bottomMargin != held[1] || params.bottomMargin == base) return false;
+                if (held == null || params.bottomMargin != held[1] || params.bottomMargin == base) return footerChanged;
                 params.bottomMargin = base;
                 seek.setLayoutParams(params);
                 return true;
             }
-            int row = bar.getLayoutParams().height;
-            if (row <= 0) return false;
+            int row = NativeGlassBar.isGlass() ? 0 : bar.getLayoutParams().height;
+            if (row <= 0 && !NativeGlassBar.isGlass()) return footerChanged;
             // The track stays one pixel above the native bottom-tabs boundary.
             margin = row + reserve(bar) - seekHeight / 2 + 1;
             SEEK_MARGINS.put(seek, new int[]{base, margin, margin + seekHeight / 2, parentHeight(seek)});
         }
-        if (params.bottomMargin == margin) return false;
+        if (params.bottomMargin == margin) return footerChanged;
         params.bottomMargin = margin;
         seek.setLayoutParams(params);
+        return true;
+    }
+
+    /** The main pager's native strip reserves the solid row even when the row is transparent. */
+    private static boolean measureGlassPager(View mask) {
+        View bar = tabs(mask);
+        if (bar == null || bar.getParent() != mask) return false;
+        int stripId = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "47.4.3:cnc", false);
+        int pagerId = IDS.resolve(mask.getResources(), mask.getContext().getPackageName(), "viewpager_container", false);
+        View strip = stripId == 0 ? null : mask.findViewById(stripId);
+        if (strip == null || !(strip.getParent() instanceof View)
+                || pagerId == 0 || ((View) strip.getParent()).getId() != pagerId) return false;
+        ViewGroup.LayoutParams params = strip.getLayoutParams();
+        if (params == null) return false;
+        Integer before = GLASS_STRIPS.get(strip);
+        if (NativeGlassBar.isGlass()) {
+            if (before == null) GLASS_STRIPS.put(strip, params.height);
+            if (params.height == 0) return false;
+            params.height = 0;
+        } else {
+            if (before == null) return false;
+            GLASS_STRIPS.remove(strip);
+            if (params.height != 0 || params.height == before) return false;
+            params.height = before;
+        }
+        strip.setLayoutParams(params);
         return true;
     }
 

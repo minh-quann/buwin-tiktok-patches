@@ -78,6 +78,25 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         invoke-super { p0, p1 }, $parent->dispatchDraw(Landroid/graphics/Canvas;)V
         return-void
     """)
+    check(component.methods.none { it.name == "dispatchTouchEvent" })
+    val touch = nativeOverride(owner, "dispatchTouchEvent", listOf("Landroid/view/MotionEvent;"), 3, """
+        invoke-static { p0, p1 }, Lapp/morphe/extension/tiktok/feed/NativeGlassBar;->consumeTouch(Landroid/view/View;Landroid/view/MotionEvent;)Z
+        move-result v0
+        if-eqz v0, :native_tab_touch
+        return v0
+        :native_tab_touch
+        invoke-super { p0, p1 }, $parent->dispatchTouchEvent(Landroid/view/MotionEvent;)Z
+        move-result v0
+        return v0
+    """, "Z", AccessFlags.PUBLIC.value)
+    check(component.methods.none { it.name == "getChildCount" })
+    val childCount = nativeOverride(owner, "getChildCount", emptyList(), 2, """
+        invoke-super { p0 }, $parent->getChildCount()I
+        move-result v0
+        invoke-static { p0, v0 }, Lapp/morphe/extension/tiktok/feed/NativeGlassBar;->nativeChildCount(Landroid/view/ViewGroup;I)I
+        move-result v0
+        return v0
+    """, "I", AccessFlags.PUBLIC.value)
     val insets = nativeOverride(owner, "onApplyWindowInsets", listOf("Landroid/view/WindowInsets;"), 2, """
         invoke-virtual { p0 }, Landroid/view/View;->requestLayout()V
         invoke-super { p0, p1 }, $parent->onApplyWindowInsets(Landroid/view/WindowInsets;)Landroid/view/WindowInsets;
@@ -93,6 +112,7 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         return-void
     """)
     val detach = nativeOverride(owner, "onDetachedFromWindow", emptyList(), 2, """
+        invoke-static { p0 }, Lapp/morphe/extension/tiktok/feed/NativeGlassBar;->release(Landroid/view/View;)V
         invoke-virtual { p0 }, Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;
         move-result-object v0
         invoke-virtual { v0, p0 }, Landroid/view/ViewTreeObserver;->removeOnPreDrawListener($listener)V
@@ -118,6 +138,41 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         invoke-virtual { p1, v0 }, Landroid/graphics/Canvas;->restoreToCount(I)V
         return-void
     """)
+    val maskDefinition = classDefBy(mask)
+    check(maskDefinition.superclass == "Landroid/widget/FrameLayout;"
+        && maskDefinition.methods.none { it.name in setOf("dispatchDraw", "drawChild") }) {
+        "Native glass: the mask drawing contract changed; review before patching"
+    }
+    val maskTouch = maskDefinition.methods.single { it.name == "dispatchTouchEvent" && it.parameterTypes == listOf("Landroid/view/MotionEvent;") }
+    check(maskTouch.implementation!!.registerCount >= 3) { "Native tab touch: mask has no scratch register" }
+    val glass = "Lapp/morphe/extension/tiktok/glass/NativeGlassRenderer;"
+    val sceneDraw = nativeOverride(mask, "dispatchDraw", listOf("Landroid/graphics/Canvas;"), 5, """
+        invoke-static { p0, p1 }, $glass->beginScene(Landroid/view/ViewGroup;Landroid/graphics/Canvas;)Landroid/graphics/Canvas;
+        move-result-object v0
+        invoke-super { p0, v0 }, Landroid/widget/FrameLayout;->dispatchDraw(Landroid/graphics/Canvas;)V
+        invoke-static { p0, p1 }, $glass->endScene(Landroid/view/ViewGroup;Landroid/graphics/Canvas;)Landroid/view/View;
+        move-result-object v0
+        if-eqz v0, :native_scene_done
+        invoke-virtual { p0 }, Landroid/view/View;->getDrawingTime()J
+        move-result-wide v1
+        invoke-super { p0, p1, v0, v1, v2 }, Landroid/widget/FrameLayout;->drawChild(Landroid/graphics/Canvas;Landroid/view/View;J)Z
+        move-result v0
+        if-eqz v0, :native_scene_done
+        invoke-virtual { p0 }, Landroid/view/View;->postInvalidateOnAnimation()V
+        :native_scene_done
+        return-void
+    """)
+    val sceneChild = nativeOverride(mask, "drawChild", listOf("Landroid/graphics/Canvas;", "Landroid/view/View;", "J"), 6, """
+        invoke-static { p0, p2 }, $glass->skipSceneChild(Landroid/view/ViewGroup;Landroid/view/View;)Z
+        move-result v0
+        if-eqz v0, :native_scene_child
+        const/4 v0, 0x0
+        return v0
+        :native_scene_child
+        invoke-super { p0, p1, p2, p3, p4 }, Landroid/widget/FrameLayout;->drawChild(Landroid/graphics/Canvas;Landroid/view/View;J)Z
+        move-result v0
+        return v0
+    """, "Z")
     val measureHooks = listOf(cell to "measureCell", mask to "measureFeed").map { (type, hook) ->
         val definition = classDefBy(type)
         check(definition.methods.none { it.name == "onMeasure" }) {
@@ -289,6 +344,16 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
             """, ExternalLabel("native_cover_original", getInstruction(0)))
         }
         mutableClassDefBy(cell).methods.add(cellDraw)
+        mutableClassDefBy(mask).methods.single { it.name == maskTouch.name && it.parameterTypes == maskTouch.parameterTypes }.apply {
+            addInstructionsWithLabels(0, """
+                invoke-static { p0, p1 }, Lapp/morphe/extension/tiktok/feed/NativeGlassBar;->dispatchFromMask(Landroid/view/View;Landroid/view/MotionEvent;)Z
+                move-result v0
+                if-eqz v0, :native_mask_touch
+                return v0
+            """, ExternalLabel("native_mask_touch", getInstruction(0)))
+        }
+        mutableClassDefBy(mask).methods.add(sceneDraw)
+        mutableClassDefBy(mask).methods.add(sceneChild)
         screenWriters.forEach { writer ->
             mutableClassDefBy(screenType).methods.single { it.name == writer.name && it.parameterTypes == writer.parameterTypes }.apply {
                 implementation!!.instructions.toList().indices.filter { getInstruction(it).opcode == Opcode.RETURN_VOID }
@@ -309,7 +374,7 @@ internal fun BytecodePatchContext.resolveNativeBottomBar(): () -> Unit {
         }
         val mutable = mutableClassDefBy(owner)
         mutable.interfaces.add(listener)
-        listOf(measure, draw, insets, attach, detach, preDraw).forEach { mutable.methods.add(it) }
+        listOf(measure, draw, touch, childCount, insets, attach, detach, preDraw).forEach { mutable.methods.add(it) }
         measureHooks.forEach { (type, method) -> mutableClassDefBy(type).methods.add(method) }
         safeAreas.forEach { (type, hook) ->
             val view = mutableClassDefBy(type)

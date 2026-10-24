@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the entire TikTok Java extension with javac/D8, optionally update a local MPP.
+"""Build the TikTok Java/Kotlin extension with javac, Compose and R8, optionally update a local MPP.
 
 Android/TikTok stubs are compile-only and are never included in the extension DEX.
 Use the normal Gradle release pipeline for published releases.
@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import importlib.util
 from datetime import datetime, timezone
 from zipfile import ZipFile, ZIP_DEFLATED
 
@@ -26,6 +27,54 @@ def jar_classes(directory, output):
     with ZipFile(output, 'w', ZIP_DEFLATED) as jar:
         for source in sorted(directory.rglob('*.class')):
             jar.write(source, source.relative_to(directory).as_posix())
+
+
+def compile_kotlin(android, destination):
+    """Compile native Compose before javac with the privately bundled Kotlin/runtime libraries."""
+    sources = sorted((ROOT / 'extensions/tiktok/src/main/kotlin').rglob('*.kt'))
+    if not sources:
+        return []
+    artifacts = Path.home() / '.gradle/caches/modules-2/files-2.1'
+    def cached(group, name, version=None):
+        candidates = list((artifacts / group / name).glob((version or '*') + '/*/*.jar'))
+        candidates = sorted(p for p in candidates if not p.name.endswith(('-sources.jar', '-javadoc.jar')))
+        if not candidates:
+            raise RuntimeError('Need cached Kotlin build dependency: ' + group + ':' + name)
+        return candidates[-1]
+    # Use the reviewed compiler when available, or the same installed compiler used by the
+    # local native-hook builder. No Gradle remote build cache or compiler plugins are loaded.
+    reviewed = artifacts / 'org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21'
+    version = '2.4.21' if reviewed.is_dir() else '2.4.10'
+    compiler = cached('org.jetbrains.kotlin', 'kotlin-compiler-embeddable', version)
+    stdlib = cached('org.jetbrains.kotlin', 'kotlin-stdlib', version)
+    annotations = cached('org.jetbrains', 'annotations', '26.1.0')
+    android_annotations = cached('androidx.annotation', 'annotation-jvm')
+    runtime = [compiler, stdlib, annotations]
+    for group, name in [('org.jetbrains.kotlin', 'kotlin-script-runtime'),
+                        ('org.jetbrains.kotlin', 'kotlin-reflect'),
+                        ('org.jetbrains.intellij.deps', 'trove4j'),
+                        ('org.jetbrains.kotlinx', 'kotlinx-coroutines-core-jvm')]:
+        runtime.append(cached(group, name))
+    spec = importlib.util.spec_from_file_location('glass_runtime', ROOT / 'scripts/glass-runtime.py')
+    glass = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(glass)
+    runtime_work = destination.parent / 'glass-runtime'
+    if runtime_work.exists(): shutil.rmtree(runtime_work)
+    runtime_work.mkdir()
+    libraries = glass.inputs(runtime_work, android, run)
+    sources += sorted((ROOT / 'extensions/tiktok/src/glass/kotlin').rglob('*.kt'))
+    plugin = cached('org.jetbrains.kotlin', 'kotlin-compose-compiler-plugin-embeddable', version)
+    run(['java', '-cp', os.pathsep.join(map(str, runtime)),
+         'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect',
+         '-jvm-target', '17', '-module-name', 'buwin_native_glass',
+         '-Xjava-source-roots=' + ','.join(str(ROOT / path) for path in (
+             'extensions/tiktok/src/main/java', 'extensions/shared/library/src/main/java',
+             'extensions/tiktok/stub/src/main/java')),
+         '-Xplugin=' + str(plugin),
+         '-classpath', os.pathsep.join(map(str, [android, stdlib, annotations, android_annotations, *libraries])),
+         '-d', destination, *sources])
+    print('Compiled', len(sources), 'native Kotlin sources')
+    return [stdlib, annotations, android_annotations, *libraries]
 
 
 def update_cache(cache, dex):
@@ -93,16 +142,33 @@ def main():
             run(['javac', '-encoding', 'UTF-8', '-source', '17', '-target', '17',
                  '-cp', os.pathsep.join(map(str, classpath)), '-d', destination, '@' + str(source_list)])
             print('Compiled', len(sources), 'Java sources into', destination.name)
+        kotlin_dependencies = compile_kotlin(android, classes)
         compile_java(['extensions/tiktok/stub/src/main/java'], stubs, [android])
         compile_java(['extensions/shared/library/src/main/java', 'extensions/tiktok/src/main/java'],
-                     classes, [android, stubs, annotations[-1]])
+                     classes, [android, stubs, classes, annotations[-1], *kotlin_dependencies])
         jar_classes(stubs, work / 'stubs.jar')
         jar_classes(classes, work / 'extension.jar')
         dex_directory = work / 'dex'
         dex_directory.mkdir()
-        run([d8, '--release', '--min-api', '23', '--lib', android,
-             '--classpath', work / 'stubs.jar', '--classpath', annotations[-1],
-             '--output', dex_directory, work / 'extension.jar'])
+        kotlin_classpath = [part for dependency in kotlin_dependencies for part in ['--classpath', dependency]]
+        rules = work / 'glass-r8.pro'
+        rules.write_text('''-keep class app.morphe.extension.** { *; }
+-keepattributes Signature,InnerClasses,EnclosingMethod,RuntimeVisibleAnnotations,AnnotationDefault
+-repackageclasses app.morphe.extension.tiktok.glass.runtime
+-dontwarn org.jetbrains.annotations.**
+-dontwarn org.intellij.lang.annotations.**
+-dontwarn android.view.DisplayListCanvas
+-dontwarn android.view.RenderNode
+-dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+-dontwarn androidx.window.extensions.**
+-dontwarn androidx.window.sidecar.**
+
+''')
+        program = [p for p in kotlin_dependencies if p.parent.name == 'glass-runtime']
+        r8 = args.sdk / 'build-tools' / args.build_tools / 'lib/d8.jar'
+        run(['java', '-Xmx5g', '-cp', r8, 'com.android.tools.r8.R8', '--release',
+             '--min-api', '23', '--lib', android, '--lib', work / 'stubs.jar',
+             '--pg-conf', rules, '--output', dex_directory, work / 'extension.jar', *program])
         dexes = list(dex_directory.glob('*.dex'))
         if len(dexes) != 1:
             raise ValueError('Expected a single extension DEX')

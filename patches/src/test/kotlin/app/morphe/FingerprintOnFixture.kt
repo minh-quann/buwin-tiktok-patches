@@ -23,9 +23,10 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference
  * code: the method takes them when its instructions hold them in order, with gaps, and taking
  * each filter's earliest instruction is enough to know. Filters placed any other way and class
  * fingerprints are not modelled, and a fingerprint using either is refused rather than half
- * judged.
+ * judged. [exactStrings] also checks the patcher 2.0 behavior used when a newer bundle is
+ * selected alongside ours: raw string anchors must equal the loaded literal.
  */
-internal fun Fingerprint.takes(method: Method, classDef: ClassDef): Boolean {
+internal fun Fingerprint.takes(method: Method, classDef: ClassDef, exactStrings: Boolean = false): Boolean {
     require(classFingerprint == null) { "class fingerprints are not modelled: $this" }
     val ordered = filters.orEmpty().also { all ->
         require(all.all { it.location is InstructionLocation.MatchAfterAnywhere }) {
@@ -50,7 +51,7 @@ internal fun Fingerprint.takes(method: Method, classDef: ClassDef): Boolean {
         method.implementation?.instructions?.forEach { instruction ->
             if (instruction.opcode != Opcode.CONST_STRING && instruction.opcode != Opcode.CONST_STRING_JUMBO) return@forEach
             val loaded = ((instruction as ReferenceInstruction).reference as StringReference).string
-            val answered = remaining.indexOfFirst { loaded.contains(it) }
+            val answered = remaining.indexOfFirst { if (exactStrings) loaded == it else loaded.contains(it) }
             if (answered >= 0) remaining.removeAt(answered)
         }
         if (remaining.isNotEmpty()) return false

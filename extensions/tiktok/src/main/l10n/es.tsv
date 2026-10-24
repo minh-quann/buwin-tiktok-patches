@@ -2176,3 +2176,10 @@ Only on the sides of the video	Solo en los lados del video
 Your Long press choice runs only on the left and right thirds of the video. A press in the middle still opens TikTok's own menu. It needs a Long press choice other than TikTok default.	Tu elección de Pulsación larga se aplica solo en el tercio izquierdo y derecho del video. Una pulsación en el centro sigue abriendo el menú propio de TikTok. Necesita una opción de Pulsación larga distinta de Predeterminado de TikTok.
 Full-width progress bar	Barra de progreso a todo el ancho
 Run the progress bar from one screen edge to the other, without the gap TikTok leaves at each end.	La barra de progreso va de un borde de la pantalla al otro, sin el hueco que TikTok deja en cada extremo.
+
+# Native bottom bar styles (restart required)
+Bottom bar style	Estilo de la barra inferior
+TikTok original	Original de TikTok
+Solid black	Negro sólido
+Liquid Glass — Kyant	Liquid Glass — Kyant
+Liquid Glass floats the native tabs over the video. Glass effects require Android 13 or newer.	Liquid Glass muestra las pestañas nativas flotando sobre el vídeo. Los efectos de cristal requieren Android 13 o posterior.

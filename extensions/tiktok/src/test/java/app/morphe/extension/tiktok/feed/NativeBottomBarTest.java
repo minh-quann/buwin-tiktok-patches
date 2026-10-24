@@ -322,6 +322,39 @@ public class NativeBottomBarTest {
         }
     }
 
+    @Test @Config(sdk = {30, 35, 37})
+    public void hiddenSecondaryTabsCannotUndoTheMainTabsBeforeDrawing() throws Exception {
+        try (var controller = Robolectric.buildActivity(Activity.class).setup()) {
+            FrameLayout mask = new FrameLayout(controller.get());
+            controller.get().setContentView(mask);
+            FrameLayout cell = new FrameLayout(mask.getContext());
+            mask.addView(cell, new FrameLayout.LayoutParams(1320, 2710));
+            View widgets = new View(mask.getContext());
+            widgets.setId(0x7f0aa089);
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1320, 2862, Gravity.BOTTOM);
+            params.bottomMargin = -152;
+            cell.addView(widgets, params);
+            Tabs main = tabs(mask);
+            main.setId(0x7f0a4ecc);
+            Tabs secondary = tabs(mask);
+            secondary.setId(0x7f0a4ebd);
+            secondary.setVisibility(View.GONE);
+            String pkg = mask.getContext().getPackageName();
+            cache().putForTests(pkg, "47.4.3:onp", main.getId());
+            cache().putForTests(pkg, "widget_container", widgets.getId());
+            NativeBottomBar.measureCell(cell);
+            layoutHonor(mask);
+            int top = params.topMargin, bottom = params.bottomMargin;
+            assertTrue("main tabs must be settled", NativeBottomBar.prepareFrame(main));
+            for (int i = 0; i < 5; i++) {
+                assertTrue("hidden secondary tabs must not veto the frame", NativeBottomBar.prepareFrame(secondary));
+                assertEquals(top, params.topMargin);
+                assertEquals(bottom, params.bottomMargin);
+                assertTrue("main tabs must not fight a second pre-draw listener", NativeBottomBar.prepareFrame(main));
+            }
+        }
+    }
+
     private void layoutHonor(View root) {
         root.measure(View.MeasureSpec.makeMeasureSpec(1320, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(2868, View.MeasureSpec.EXACTLY));

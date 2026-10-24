@@ -188,7 +188,7 @@ final class SeeThroughBottomBar {
     static void adjustBottomBarChin(View bar) {
         if (bar == null) return;
         bottomBarRef = new java.lang.ref.WeakReference<>(bar);
-        bar.setBackgroundColor(Color.BLACK);
+        if (!NativeGlassBar.original()) NativeGlassBar.prepare(bar);
     }
 
     /** Whether the spacer under the video may be collapsed. */
@@ -223,7 +223,7 @@ final class SeeThroughBottomBar {
     static void setBackgroundClear(View bar, boolean clear, boolean floating) {
         if (bar == null) return;
         // The user explicitly requires the entire bottom bar to be solid black like iOS, never see-through
-        bar.setBackgroundColor(Color.BLACK);
+        if (!NativeGlassBar.original()) NativeGlassBar.prepare(bar);
     }
 
     /**

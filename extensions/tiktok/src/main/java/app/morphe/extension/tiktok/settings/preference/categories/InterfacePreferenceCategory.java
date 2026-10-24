@@ -610,18 +610,10 @@ public final class InterfacePreferenceCategory extends ConditionalPreferenceCate
                     "With the fade below 100, the buttons and caption stay on screen at that level in Clear display, and taps go through them to the video. Off, Clear display hides them the way it does at 100.",
                     Settings.FADE_IN_CLEAR_DISPLAY
             ));
-            addPreference(new TogglePreference(
-                    context,
-                    "See-through bottom bar",
-                    "Let the video reach the bottom of the screen on the main feed and show the tabs over it with no bar behind them.",
-                    Settings.SEE_THROUGH_BOTTOM_BAR
-            ));
-            addPreference(new TogglePreference(
-                    context,
-                    "Floating bottom bar",
-                    "Show the main feed's tabs on a rounded, see-through dark pill that floats over the video. Needs See-through bottom bar.",
-                    Settings.FLOATING_BOTTOM_BAR
-            ));
+            addPreference(new ChoicePreference(context, "Bottom bar style", Settings.BOTTOM_BAR_STYLE,
+                    new String[]{"TikTok original", "Solid black", "Liquid Glass — Kyant"},
+                    new String[]{"original", "black", "glass"})
+                    .withNote("Liquid Glass floats the native tabs over the video. Glass effects require Android 13 or newer."));
             addPreference(new TogglePreference(
                     context,
                     "See-through status bar",

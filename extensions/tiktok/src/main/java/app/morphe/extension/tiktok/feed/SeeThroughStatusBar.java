@@ -218,7 +218,7 @@ public final class SeeThroughStatusBar {
     /**
      * Finds the Activity hosting the given view.
      */
-    static Activity activityOf(View view) {
+    public static Activity activityOf(View view) {
         if (view == null) return null;
         Context context = view.getContext();
         while (context instanceof ContextWrapper) {
@@ -271,7 +271,7 @@ public final class SeeThroughStatusBar {
     }
 
     /** Finds the root view of the feed cell (view_rootview) or topmost laid-out ancestor. */
-    static View findCellRoot(View view) {
+    public static View findCellRoot(View view) {
         View current = view;
         View best = null;
         while (current != null) {
@@ -389,7 +389,10 @@ public final class SeeThroughStatusBar {
             }
         }
         if (width <= 0 || height <= 0) return null;
-        if (!RememberClearDisplayPatch.isClearDisplayNow() && !RememberClearDisplayPatch.isCarryingClear()) {
+        int glassHeight = NativeGlassBar.viewportHeight(video, 0);
+        boolean glass = glassHeight > 0;
+        if (glass) height = glassHeight;
+        if (!glass && !RememberClearDisplayPatch.isClearDisplayNow() && !RememberClearDisplayPatch.isCarryingClear()) {
             height = MessageVideoPage.active(activityOf(video)) ? MessageVideoPage.bottom(cell, height)
                     : SeeThroughBottomBar.getBottomBarTop(cell, height);
         }

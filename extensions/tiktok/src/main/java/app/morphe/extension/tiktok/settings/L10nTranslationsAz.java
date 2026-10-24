@@ -52,6 +52,11 @@ final class L10nTranslationsAz {
         fill33(table);
         fill34(table);
         fill35(table);
+        table.put("Bottom bar style", "Alt panelin üslubu");
+        table.put("TikTok original", "TikTok-un orijinal üslubu");
+        table.put("Solid black", "Tam qara");
+        table.put("Liquid Glass — Kyant", "Liquid Glass — Kyant");
+        table.put("Liquid Glass floats the native tabs over the video. Glass effects require Android 13 or newer.", "Liquid Glass yerli nişanları videonun üzərində göstərir. Şüşə effektləri üçün Android 13 və ya daha yeni versiya tələb olunur.");
         return table;
     }
 

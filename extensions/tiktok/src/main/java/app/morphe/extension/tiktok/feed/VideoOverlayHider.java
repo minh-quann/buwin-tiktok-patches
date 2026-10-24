@@ -631,7 +631,8 @@ public final class VideoOverlayHider {
             boolean commentsOpen = FeedVisibility.isCommentSheetVisible(activity);
             // The bottom bar goes clear and the spacer under each video goes, on the main feed
             // only: the opened-post pager has no tab bar (#145).
-            boolean seeThroughBar = Settings.SEE_THROUGH_BOTTOM_BAR.get() && !detailPager;
+            boolean seeThroughBar = Settings.SEE_THROUGH_BOTTOM_BAR.get() && !detailPager
+                    && !NativeGlassBar.isGlass() && !NativeGlassBar.original();
             if (!seeThroughBar) SeeThroughBottomBar.reset();
             seeThroughBarNow = seeThroughBar;
             floatingBarNow = seeThroughBar && Settings.FLOATING_BOTTOM_BAR.get();
@@ -2353,6 +2354,15 @@ public final class VideoOverlayHider {
             return;
         }
         ViewGroup vg = (ViewGroup) bar;
+        if (NativeGlassBar.fade(bar, percent)) {
+            // The Compose component owns the visible foreground. Never restore the hidden
+            // native copies here, or every traversal draws a second icon/label under Glass.
+            for (int i = 0, count = vg.getChildCount(); i < count; i++) {
+                View child = vg.getChildAt(i);
+                if (child != null) { BurnInGuard.control(child); FADED_TO.remove(child); }
+            }
+            return;
+        }
         for (int i = 0, count = vg.getChildCount(); i < count; i++) {
             View child = vg.getChildAt(i);
             if (child != null) {

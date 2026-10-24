@@ -37,7 +37,8 @@ private object CaptchaPopupFingerprint : Fingerprint(
     definingClass = "/sec/SecApiImpl;",
     name = "popCaptchaV2",
     returnType = "V",
-    strings = listOf("popCaptchaV2 - riskInfo ="),
+    // Include the trailing space: patcher 2.0 compares the entire literal.
+    strings = listOf("popCaptchaV2 - riskInfo = "),
     custom = { method, _ ->
         val parameters = method.parameterTypes.map(CharSequence::toString)
         parameters.size >= 4 &&

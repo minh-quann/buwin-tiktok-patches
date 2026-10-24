@@ -53,6 +53,11 @@ class CommentMenuBlockAnchorsTest {
 
             val (_, sink) = one("the comment menu's list sink", CommentMenuListFingerprint)
             val (_, items) = one("the comment menu's row builder", CommentMenuItemsFingerprint)
+            val exactItems = classes.flatMap { owner ->
+                owner.methods.filter { CommentMenuItemsFingerprint.takes(it, owner, exactStrings = true) }
+            }
+            assertEquals("${apk.name}: patcher 2.0 exact strings must select the same row builder",
+                listOf(items), exactItems)
             val reportActions = matches(AdReportActionKeyFingerprint).map { it.first }
             assertTrue("${apk.name}: no ad Report share action", reportActions.isNotEmpty())
             val (blockAction, _) = one("the profile Block share action", ProfileBlockActionKeyFingerprint)

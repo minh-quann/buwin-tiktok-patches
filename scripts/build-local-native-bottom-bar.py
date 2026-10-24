@@ -38,6 +38,10 @@ def main():
     parser.add_argument('--prepare-only', action='store_true', help='Build/verify without replacing the cache')
     parser.add_argument('--subtitle-tools', action='store_true',
                         help='Rebuild Subtitle tools instead of the bottom-bar Kotlin sources')
+    parser.add_argument('--comment-menu', action='store_true',
+                        help='Rebuild the comment menu fingerprints instead of bottom-bar hooks')
+    parser.add_argument('--patch-source', type=Path, action='append',
+                        help='Compile these Kotlin patch sources instead (repeat for multiple files)')
     parser.add_argument('--desktop-jar', type=Path,
                         default=Path.home() / '.local/share/morphe-desktop/morphe-desktop.jar')
     parser.add_argument('--output', type=Path, default=ROOT / 'extensions/tiktok/build/native-bottom-bar')
@@ -58,7 +62,9 @@ def main():
         classes = work / 'classes'
         classes.mkdir()
         package = ROOT / 'patches/src/main/kotlin/app/morphe/patches/tiktok/interaction/videooverlays'
-        sources = ([package.parent / 'captions/SubtitleToolsPatch.kt'] if args.subtitle_tools else
+        sources = ([source.resolve() for source in args.patch_source] if args.patch_source else
+                   [package.parents[1] / 'misc/commenttools/CommentMenuBlockHooks.kt'] if args.comment_menu else
+                   [package.parent / 'captions/SubtitleToolsPatch.kt'] if args.subtitle_tools else
                    [package / 'NativeBottomBarHooks.kt', package / 'HideVideoOverlaysPatch.kt'])
         run(['java', '-cp', os.pathsep.join(map(str, [compiler, args.desktop_jar, annotations])),
              'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect',
@@ -68,8 +74,10 @@ def main():
              *sources])
         replacements = {p.relative_to(classes).as_posix(): p.read_bytes()
                         for p in classes.rglob('*.class')}
-        expected = '/SubtitleToolsPatchKt.class' if args.subtitle_tools else '/NativeBottomBarHooksKt.class'
-        if not any(name.endswith(expected) for name in replacements):
+        expected = (None if args.patch_source else
+                    '/CommentMenuItemsFingerprint.class' if args.comment_menu else
+                    '/SubtitleToolsPatchKt.class' if args.subtitle_tools else '/NativeBottomBarHooksKt.class')
+        if not replacements or expected and not any(name.endswith(expected) for name in replacements):
             raise RuntimeError('Native hook did not compile')
         with ZipFile(baseline) as original:
             names = original.namelist()
@@ -92,7 +100,9 @@ def main():
                 raise RuntimeError('Expected one patch DEX')
             replacements['classes.dex'] = dexes[0].read_bytes()
             replacements['extensions/tiktok.mpe'] = (extension_output / 'classes.dex').read_bytes()
-            prepared = output / ('subtitle-tools.mpp' if args.subtitle_tools else 'native-bottom-bar.mpp')
+            prepared = output / ('rebuilt-patches.mpp' if args.patch_source else
+                                 'comment-menu.mpp' if args.comment_menu else
+                                 'subtitle-tools.mpp' if args.subtitle_tools else 'native-bottom-bar.mpp')
             with ZipFile(prepared, 'w') as bundle:
                 bundle.comment = original.comment
                 for entry in original.infolist():

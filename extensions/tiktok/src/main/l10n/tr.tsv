@@ -2176,3 +2176,10 @@ Only on the sides of the video	Yalnızca videonun kenarlarında
 Your Long press choice runs only on the left and right thirds of the video. A press in the middle still opens TikTok's own menu. It needs a Long press choice other than TikTok default.	Uzun basma seçimin yalnızca videonun sol ve sağ üçte birinde çalışır. Ortada basmak yine TikTok'un kendi menüsünü açar. Uzun basma için TikTok varsayılanı dışında bir seçim gerekir.
 Full-width progress bar	Tam genişlikte ilerleme çubuğu
 Run the progress bar from one screen edge to the other, without the gap TikTok leaves at each end.	İlerleme çubuğu, TikTok'un her iki uçta bıraktığı boşluk olmadan ekranın bir kenarından diğerine uzanır.
+
+# Native bottom bar styles (restart required)
+Bottom bar style	Alt çubuk stili
+TikTok original	TikTok özgün görünümü
+Solid black	Düz siyah
+Liquid Glass — Kyant	Liquid Glass — Kyant
+Liquid Glass floats the native tabs over the video. Glass effects require Android 13 or newer.	Liquid Glass, yerel sekmeleri videonun üzerinde yüzer şekilde gösterir. Cam efektleri Android 13 veya üzerini gerektirir.

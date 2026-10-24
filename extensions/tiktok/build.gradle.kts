@@ -204,6 +204,7 @@ dependencies {
     compileOnly(project(":extensions:shared:library"))
     compileOnly(project(":extensions:tiktok:stub"))
     compileOnly(libs.annotation)
+    compileOnly("org.jetbrains:annotations:26.1.0") // Upstream Kyant AGSL source annotations.
     testImplementation(project(":extensions:shared:library"))
     testImplementation(project(":extensions:tiktok:stub"))
     testImplementation("junit:junit:4.13.2")

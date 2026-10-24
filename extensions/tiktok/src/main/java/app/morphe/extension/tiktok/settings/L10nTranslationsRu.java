@@ -55,6 +55,11 @@ final class L10nTranslationsRu {
         fill36(table);
         fill37(table);
         fill38(table);
+        table.put("Bottom bar style", "Стиль нижней панели");
+        table.put("TikTok original", "Оригинальный TikTok");
+        table.put("Solid black", "Сплошной чёрный");
+        table.put("Liquid Glass — Kyant", "Liquid Glass — Kyant");
+        table.put("Liquid Glass floats the native tabs over the video. Glass effects require Android 13 or newer.", "Liquid Glass размещает родные вкладки поверх видео. Для эффекта стекла требуется Android 13 или новее.");
         return table;
     }
 
